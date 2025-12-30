@@ -10,8 +10,8 @@ import { initTRPC, TRPCError } from "@trpc/server";
 import superjson from "superjson";
 import { z, ZodError } from "zod/v4";
 
-import type { Auth } from "@acme/auth";
-import { db } from "@acme/db/client";
+import type { Auth } from "@everylab/auth";
+import { db } from "@everylab/db/client";
 
 /**
  * 1. CONTEXT
@@ -29,13 +29,14 @@ import { db } from "@acme/db/client";
 export const createTRPCContext = async (opts: {
   headers: Headers;
   auth: Auth;
-}) => {
-  const authApi = opts.auth.api;
-  const session = await authApi.getSession({
+}): Promise<{
+  session: Awaited<ReturnType<Auth["api"]["getSession"]>>;
+  db: typeof db;
+}> => {
+  const session = await opts.auth.api.getSession({
     headers: opts.headers,
   });
   return {
-    authApi,
     session,
     db,
   };
@@ -74,7 +75,7 @@ const t = initTRPC.context<typeof createTRPCContext>().create({
 export const createTRPCRouter = t.router;
 
 /**
- * Middleware for timing procedure execution and adding an articifial delay in development.
+ * Middleware for timing procedure execution and adding an artificial delay in development.
  *
  * You can remove this if you don't like it, but it can help catch unwanted waterfalls by simulating
  * network latency that would occur in production but not in local development.
@@ -126,3 +127,21 @@ export const protectedProcedure = t.procedure
       },
     });
   });
+
+/**
+ * Admin procedure
+ *
+ * Only accessible to users with the "admin" role.
+ */
+export const adminProcedure = protectedProcedure.use(({ ctx, next }) => {
+  // Check if user has admin role
+  // Note: The role is stored in the user table, accessed via session
+  const userRole = (ctx.session.user as { role?: string }).role;
+  if (userRole !== "admin") {
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: "Only admins can access this resource",
+    });
+  }
+  return next({ ctx });
+});

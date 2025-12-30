@@ -1,20 +1,16 @@
 import type { BetterAuthOptions, BetterAuthPlugin } from "better-auth";
-import { expo } from "@better-auth/expo";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
-import { oAuthProxy } from "better-auth/plugins";
+import { admin } from "better-auth/plugins";
 
-import { db } from "@acme/db/client";
+import { db } from "@everylab/db/client";
 
-export function initAuth<
-  TExtraPlugins extends BetterAuthPlugin[] = [],
->(options: {
+export function initAuth<TExtraPlugins extends BetterAuthPlugin[] = []>(options: {
   baseUrl: string;
-  productionUrl: string;
   secret: string | undefined;
-
-  discordClientId: string;
-  discordClientSecret: string;
+  // Google OAuth for TikTok creators
+  googleClientId?: string;
+  googleClientSecret?: string;
   extraPlugins?: TExtraPlugins;
 }) {
   const config = {
@@ -24,20 +20,25 @@ export function initAuth<
     baseURL: options.baseUrl,
     secret: options.secret,
     plugins: [
-      oAuthProxy({
-        productionURL: options.productionUrl,
+      // Admin plugin for role-based access
+      admin({
+        defaultRole: "creator",
       }),
-      expo(),
       ...(options.extraPlugins ?? []),
     ],
     socialProviders: {
-      discord: {
-        clientId: options.discordClientId,
-        clientSecret: options.discordClientSecret,
-        redirectURI: `${options.productionUrl}/api/auth/callback/discord`,
-      },
+      ...(options.googleClientId && options.googleClientSecret
+        ? {
+            google: {
+              clientId: options.googleClientId,
+              clientSecret: options.googleClientSecret,
+            },
+          }
+        : {}),
     },
-    trustedOrigins: ["expo://"],
+    emailAndPassword: {
+      enabled: true,
+    },
     onAPIError: {
       onError(error, ctx) {
         console.error("BETTER AUTH API ERROR", error, ctx);

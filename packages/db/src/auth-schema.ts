@@ -1,4 +1,8 @@
-import { pgTable } from "drizzle-orm/pg-core";
+import { relations } from "drizzle-orm";
+import { pgEnum, pgTable } from "drizzle-orm/pg-core";
+
+// User role enum - defined here to avoid circular imports
+export const userRoleEnum = pgEnum("user_role", ["creator", "admin"]);
 
 export const user = pgTable("user", (t) => ({
   id: t.text().primaryKey(),
@@ -6,9 +10,18 @@ export const user = pgTable("user", (t) => ({
   email: t.text().notNull().unique(),
   emailVerified: t.boolean().notNull(),
   image: t.text(),
+  // Extended fields for TikTok Creator Network
+  role: userRoleEnum().default("creator").notNull(),
+  banned: t.boolean().default(false),
+  banReason: t.text(),
+  banExpires: t.timestamp(),
+  bankAccountInfo: t.text(), // Nullable - for future payout integration
+  // Metadata
   createdAt: t.timestamp().notNull(),
   updatedAt: t.timestamp().notNull(),
 }));
+
+// We'll define relations in schema.ts to avoid circular imports
 
 export const session = pgTable("session", (t) => ({
   id: t.text().primaryKey(),
@@ -18,6 +31,7 @@ export const session = pgTable("session", (t) => ({
   updatedAt: t.timestamp().notNull(),
   ipAddress: t.text(),
   userAgent: t.text(),
+  impersonatedBy: t.text(),
   userId: t
     .text()
     .notNull()
@@ -50,4 +64,24 @@ export const verification = pgTable("verification", (t) => ({
   expiresAt: t.timestamp().notNull(),
   createdAt: t.timestamp(),
   updatedAt: t.timestamp(),
+}));
+
+// User relations
+export const userRelations = relations(user, ({ many }) => ({
+  sessions: many(session),
+  accounts: many(account),
+}));
+
+export const sessionRelations = relations(session, ({ one }) => ({
+  user: one(user, {
+    fields: [session.userId],
+    references: [user.id],
+  }),
+}));
+
+export const accountRelations = relations(account, ({ one }) => ({
+  user: one(user, {
+    fields: [account.userId],
+    references: [user.id],
+  }),
 }));
