@@ -161,11 +161,6 @@ export default function SignInPage() {
           )}
         </div>
 
-        <div className="mt-4 text-center">
-          <Button variant="ghost" size="sm" onClick={() => router.push("/")}>
-            ← Back to home
-          </Button>
-        </div>
       </div>
     </main>
   );

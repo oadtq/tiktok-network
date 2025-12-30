@@ -1,9 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
-
 import { Button } from "@everylab/ui/button";
+
+import { authClient } from "~/auth/client";
 
 interface User {
   id: string;
@@ -140,8 +140,14 @@ export function AdminDashboardContent({ user }: AdminDashboardContentProps) {
             <Button variant="outline" asChild>
               <a href="/dashboard">Creator View</a>
             </Button>
-            <Button variant="outline" asChild>
-              <Link href="/">← Home</Link>
+            <Button
+              variant="outline"
+              onClick={async () => {
+                await authClient.signOut();
+                window.location.href = "/";
+              }}
+            >
+              Sign out
             </Button>
           </div>
         </div>
