@@ -15,6 +15,7 @@ import {
   Megaphone,
   Plus,
   Settings,
+  Smartphone,
   TrendingUp,
   Users,
   Video,
@@ -331,7 +332,8 @@ export function AdminDashboardContent({ user }: AdminDashboardContentProps) {
             active
             href="/admin"
           />
-          <NavItem icon={Users} label="Creators" href="/admin/creators" />
+          <NavItem icon={Smartphone} label="Cloud Phones" href="/admin/cloud-phones" />
+          <NavItem icon={Users} label="Users" href="/admin/users" />
           <NavItem
             icon={FileVideo}
             label="All Clips"
