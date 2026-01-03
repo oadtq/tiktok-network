@@ -239,16 +239,16 @@ export function DashboardContent({ user }: DashboardContentProps) {
         {/* Navigation */}
         <nav className="flex-1 space-y-1 p-4">
           <NavItem icon={Home} label="Dashboard" active href="/dashboard" />
-          <NavItem icon={Video} label="My Clips" href="/clips" />
-          <NavItem icon={BarChart3} label="Analytics" href="/analytics" />
-          <NavItem icon={Upload} label="Upload" href="/upload" />
+          <NavItem icon={Upload} label="Upload" href="/dashboard/upload" />
+          <NavItem icon={Video} label="My Clips" href="/dashboard/clips" />
+          <NavItem icon={BarChart3} label="Analytics" href="/dashboard/analytics" />
 
           <div className="my-4 border-t border-border" />
 
           <p className="mb-2 px-3 text-xs font-medium uppercase tracking-wider text-muted-foreground">
             Support
           </p>
-          <NavItem icon={Settings} label="Settings" href="/settings" />
+          <NavItem icon={Settings} label="Settings" href="/dashboard/settings" />
         </nav>
 
         {/* User Profile */}
