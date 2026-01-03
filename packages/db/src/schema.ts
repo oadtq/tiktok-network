@@ -42,6 +42,7 @@ export const tiktokAccount = pgTable("tiktok_account", (t) => ({
   name: t.varchar({ length: 256 }).notNull(), // Display name
   tiktokUsername: t.varchar({ length: 256 }).notNull().unique(),
   tiktokUserId: t.varchar({ length: 256 }), // TikTok's user ID
+  geelarkEnvId: t.varchar({ length: 256 }), // GeeLark cloud phone ID for publishing
   accessToken: t.text(), // OAuth token for API
   refreshToken: t.text(),
   tokenExpiresAt: t.timestamp(),
@@ -83,6 +84,7 @@ export const clip = pgTable("clip", (t) => ({
   publishedAt: t.timestamp({ withTimezone: true }),
   tiktokVideoId: t.varchar({ length: 256 }), // TikTok's video ID after publishing
   tiktokVideoUrl: t.text(), // URL to the published TikTok
+  geelarkTaskId: t.varchar({ length: 256 }), // GeeLark task ID for tracking publish job
   // Metadata
   createdAt: t.timestamp().defaultNow().notNull(),
   updatedAt: t
@@ -178,6 +180,34 @@ export const campaignClipRelations = relations(campaignClip, ({ one }) => ({
   clip: one(clip, {
     fields: [campaignClip.clipId],
     references: [clip.id],
+  }),
+}));
+
+// ============================================================================
+// USER TIKTOK ACCOUNTS (junction table for user-account assignment)
+// ============================================================================
+
+export const userTiktokAccount = pgTable("user_tiktok_account", (t) => ({
+  id: t.uuid().notNull().primaryKey().defaultRandom(),
+  userId: t
+    .text()
+    .notNull()
+    .references(() => authUser.id, { onDelete: "cascade" }),
+  tiktokAccountId: t
+    .uuid()
+    .notNull()
+    .references(() => tiktokAccount.id, { onDelete: "cascade" }),
+  createdAt: t.timestamp().defaultNow().notNull(),
+}));
+
+export const userTiktokAccountRelations = relations(userTiktokAccount, ({ one }) => ({
+  user: one(authUser, {
+    fields: [userTiktokAccount.userId],
+    references: [authUser.id],
+  }),
+  tiktokAccount: one(tiktokAccount, {
+    fields: [userTiktokAccount.tiktokAccountId],
+    references: [tiktokAccount.id],
   }),
 }));
 
