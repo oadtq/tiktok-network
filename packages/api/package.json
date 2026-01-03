@@ -20,6 +20,8 @@
   "dependencies": {
     "@everylab/auth": "workspace:*",
     "@everylab/db": "workspace:*",
+    "@everylab/geelark": "workspace:*",
+    "@everylab/storage": "workspace:*",
     "@everylab/validators": "workspace:*",
     "@trpc/server": "catalog:",
     "superjson": "2.2.3",
