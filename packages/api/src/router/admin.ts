@@ -4,6 +4,7 @@
  * Aggregated data for admin dashboard
  */
 import type { TRPCRouterRecord } from "@trpc/server";
+import { z } from "zod/v4";
 
 import { desc, eq } from "@everylab/db";
 import {
@@ -11,8 +12,20 @@ import {
   clipStats,
   user,
 } from "@everylab/db/schema";
+import {
+  GeeLarkClient,
+  geelarkEnv,
+} from "@everylab/geelark";
 
 import { adminProcedure } from "../trpc";
+
+// Create GeeLark client instance
+function getGeeLarkClient() {
+  return new GeeLarkClient({
+    appId: geelarkEnv.GEELARK_APP_ID,
+    apiKey: geelarkEnv.GEELARK_API_KEY,
+  });
+}
 
 export const adminRouter = {
   /**
@@ -179,4 +192,94 @@ export const adminRouter = {
       recentClips,
     };
   }),
+
+  /**
+   * Get pending clips (submitted for review)
+   */
+  pendingClips: adminProcedure.query(async ({ ctx }) => {
+    const pendingClips = await ctx.db.query.clip.findMany({
+      where: eq(clip.status, "submitted"),
+      orderBy: desc(clip.createdAt),
+      with: {
+        user: true,
+        tiktokAccount: true,
+      },
+    });
+
+    return pendingClips;
+  }),
+
+  /**
+   * Approve a clip and trigger GeeLark publishing
+   */
+  approveClip: adminProcedure
+    .input(
+      z.object({
+        clipId: z.string().uuid(),
+        title: z.string().optional(),
+        description: z.string().optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      // Get the clip with its TikTok account
+      const existingClip = await ctx.db.query.clip.findFirst({
+        where: eq(clip.id, input.clipId),
+        with: {
+          tiktokAccount: true,
+        },
+      });
+
+      if (!existingClip) {
+        throw new Error("Clip not found");
+      }
+
+      if (existingClip.status !== "submitted") {
+        throw new Error("Clip is not in submitted status");
+      }
+
+      if (!existingClip.tiktokAccount) {
+        throw new Error("Clip has no TikTok account assigned");
+      }
+
+      if (!existingClip.tiktokAccount.geelarkEnvId) {
+        throw new Error("TikTok account is not linked to a cloud phone");
+      }
+
+      // Update clip with any edits
+      const updateData: Partial<typeof clip.$inferInsert> = {
+        status: "publishing",
+      };
+      if (input.title) updateData.title = input.title;
+      if (input.description) updateData.description = input.description;
+
+      // Get GeeLark client
+      const geelark = getGeeLarkClient();
+
+      // Calculate schedule time (now + 1 minute if not scheduled)
+      const scheduleAt = existingClip.scheduledAt
+        ? Math.floor(existingClip.scheduledAt.getTime() / 1000)
+        : Math.floor(Date.now() / 1000) + 60;
+
+      // Create GeeLark publish task
+      const taskResult = await geelark.createPublishVideoTask({
+        envId: existingClip.tiktokAccount.geelarkEnvId,
+        video: existingClip.videoUrl,
+        scheduleAt,
+        videoDesc: input.description ?? existingClip.description ?? undefined,
+        planName: `Publish: ${input.title ?? existingClip.title}`,
+      });
+
+      // Update clip with task ID and status
+      const [updatedClip] = await ctx.db
+        .update(clip)
+        .set({
+          ...updateData,
+          geelarkTaskId: taskResult.taskIds[0],
+        })
+        .where(eq(clip.id, input.clipId))
+        .returning();
+
+      return updatedClip;
+    }),
 } satisfies TRPCRouterRecord;
+
