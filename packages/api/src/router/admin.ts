@@ -12,8 +12,20 @@ import {
   clipStats,
   user,
 } from "@everylab/db/schema";
+import {
+  GeeLarkClient,
+  geelarkEnv,
+} from "@everylab/geelark";
 
 import { adminProcedure } from "../trpc";
+
+// Create GeeLark client instance
+function getGeeLarkClient() {
+  return new GeeLarkClient({
+    appId: geelarkEnv.GEELARK_APP_ID,
+    apiKey: geelarkEnv.GEELARK_API_KEY,
+  });
+}
 
 export const adminRouter = {
   /**
@@ -190,6 +202,7 @@ export const adminRouter = {
       orderBy: desc(clip.createdAt),
       with: {
         user: true,
+        tiktokAccount: true,
       },
     });
 
@@ -198,35 +211,80 @@ export const adminRouter = {
   }),
 
   /**
-   * Approve a clip for publishing
+   * Approve a clip and trigger GeeLark publishing
    */
   approveClip: adminProcedure
-    .input(z.object({ clipId: z.string().uuid() }))
+    .input(
+      z.object({
+        clipId: z.string().uuid(),
+        title: z.string().optional(),
+        description: z.string().optional(),
+      })
+    )
     .mutation(async ({ ctx, input }) => {
-      const existing = await ctx.db.query.clip.findFirst({
+      // Get the clip with its TikTok account
+      const existingClip = await ctx.db.query.clip.findFirst({
         where: eq(clip.id, input.clipId),
+        with: {
+          tiktokAccount: true,
+        },
       });
 
-      if (!existing) {
+      if (!existingClip) {
         throw new Error("Clip not found");
       }
 
-      if (existing.status !== "submitted") {
-        throw new Error("Clip is not pending review");
+      if (existingClip.status !== "submitted") {
+        throw new Error("Clip is not in submitted status");
       }
 
-      const [updated] = await ctx.db
+      if (!existingClip.tiktokAccount) {
+        throw new Error("Clip has no TikTok account assigned");
+      }
+
+      if (!existingClip.tiktokAccount.geelarkEnvId) {
+        throw new Error("TikTok account is not linked to a cloud phone");
+      }
+
+      // Update clip with any edits
+      const updateData: Partial<typeof clip.$inferInsert> = {
+        status: "publishing",
+      };
+      if (input.title) updateData.title = input.title;
+      if (input.description) updateData.description = input.description;
+
+      // Get GeeLark client
+      const geelark = getGeeLarkClient();
+
+      // Calculate schedule time (now + 1 minute if not scheduled)
+      const scheduleAt = existingClip.scheduledAt
+        ? Math.floor(existingClip.scheduledAt.getTime() / 1000)
+        : Math.floor(Date.now() / 1000) + 60;
+
+      console.log(`[Admin] Creating GeeLark publish task for clip ${input.clipId}, scheduleAt: ${scheduleAt}`);
+
+      // Create GeeLark publish task
+      const taskResult = await geelark.createPublishVideoTask({
+        envId: existingClip.tiktokAccount.geelarkEnvId,
+        video: existingClip.videoUrl,
+        scheduleAt,
+        videoDesc: input.description ?? existingClip.description ?? undefined,
+        planName: `Publish: ${input.title ?? existingClip.title}`,
+      });
+
+      console.log(`[Admin] GeeLark task created, taskId: ${taskResult.taskIds[0]}`);
+
+      // Update clip with task ID and status
+      const [updatedClip] = await ctx.db
         .update(clip)
-        .set({ status: "approved" })
+        .set({
+          ...updateData,
+          geelarkTaskId: taskResult.taskIds[0],
+        })
         .where(eq(clip.id, input.clipId))
         .returning();
 
-      console.log(`[Admin] Approved clip ${input.clipId}`);
-
-      // TODO: In production, trigger the publishing scheduler here
-      // For now, just mark as approved
-
-      return updated;
+      return updatedClip;
     }),
 
   /**
@@ -323,6 +381,7 @@ export const adminRouter = {
         clips: clipsWithStats,
       };
     }),
+
   /**
    * Get aggregated stats for all clips with date range and pagination
    * Used for the admin "All Accounts" view
@@ -416,3 +475,4 @@ export const adminRouter = {
       };
     }),
 } satisfies TRPCRouterRecord;
+

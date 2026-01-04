@@ -135,7 +135,7 @@ importers:
         specifier: ^0.562.0
         version: 0.562.0(react@19.1.4)
       next:
-        specifier: ^16.0.9
+        specifier: ^16.0.10
         version: 16.0.10(@babel/core@7.28.5)(@opentelemetry/api@1.9.0)(babel-plugin-react-compiler@1.0.0)(react-dom@19.1.4(react@19.1.4))(react@19.1.4)
       react:
         specifier: catalog:react19
@@ -198,6 +198,9 @@ importers:
       '@everylab/db':
         specifier: workspace:*
         version: link:../db
+      '@everylab/geelark':
+        specifier: workspace:*
+        version: link:../geelark
       '@everylab/storage':
         specifier: workspace:*
         version: link:../storage
@@ -297,6 +300,37 @@ importers:
       drizzle-kit:
         specifier: ^0.31.5
         version: 0.31.5
+      eslint:
+        specifier: 'catalog:'
+        version: 9.38.0(jiti@2.6.1)
+      prettier:
+        specifier: 'catalog:'
+        version: 3.6.2
+      typescript:
+        specifier: 'catalog:'
+        version: 5.9.3
+
+  packages/geelark:
+    dependencies:
+      '@t3-oss/env-core':
+        specifier: ^0.13.8
+        version: 0.13.8(arktype@2.1.20)(typescript@5.9.3)(valibot@1.0.0-beta.15(typescript@5.9.3))(zod@4.1.12)
+      zod:
+        specifier: 'catalog:'
+        version: 4.1.12
+    devDependencies:
+      '@everylab/eslint-config':
+        specifier: workspace:*
+        version: link:../../tooling/eslint
+      '@everylab/prettier-config':
+        specifier: workspace:*
+        version: link:../../tooling/prettier
+      '@everylab/tsconfig':
+        specifier: workspace:*
+        version: link:../../tooling/typescript
+      '@types/node':
+        specifier: 'catalog:'
+        version: 22.18.12
       eslint:
         specifier: 'catalog:'
         version: 9.38.0(jiti@2.6.1)

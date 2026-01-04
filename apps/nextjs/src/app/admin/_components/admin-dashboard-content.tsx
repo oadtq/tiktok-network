@@ -10,7 +10,13 @@ import {
   Home,
   LayoutDashboard,
   LogOut,
+  Megaphone,
   Play,
+  Plus,
+  Settings,
+  Smartphone,
+  TrendingUp,
+  Users,
   Video,
   X,
 } from "lucide-react";
