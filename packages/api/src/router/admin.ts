@@ -222,11 +222,15 @@ export const adminRouter = {
       })
     )
     .mutation(async ({ ctx, input }) => {
-      // Get the clip with its TikTok account
+      // Get the clip with its TikTok account and cloud phone
       const existingClip = await ctx.db.query.clip.findFirst({
         where: eq(clip.id, input.clipId),
         with: {
-          tiktokAccount: true,
+          tiktokAccount: {
+            with: {
+              cloudPhone: true,
+            },
+          },
         },
       });
 
@@ -242,7 +246,7 @@ export const adminRouter = {
         throw new Error("Clip has no TikTok account assigned");
       }
 
-      if (!existingClip.tiktokAccount.geelarkEnvId) {
+      if (!existingClip.tiktokAccount.cloudPhone) {
         throw new Error("TikTok account is not linked to a cloud phone");
       }
 
@@ -265,7 +269,7 @@ export const adminRouter = {
 
       // Create GeeLark publish task
       const taskResult = await geelark.createPublishVideoTask({
-        envId: existingClip.tiktokAccount.geelarkEnvId,
+        envId: existingClip.tiktokAccount.cloudPhone.id,
         video: existingClip.videoUrl,
         scheduleAt,
         videoDesc: input.description ?? existingClip.description ?? undefined,

@@ -1,17 +1,16 @@
 /**
  * Cloud Phone Router
  *
- * Handles fetching cloud phone data from GeeLark API for admin dashboard
+ * Handles cloud phone data with database caching and GeeLark API sync
  */
 import type { TRPCRouterRecord } from "@trpc/server";
 import { z } from "zod/v4";
 
-import { eq } from "@everylab/db";
-import { tiktokAccount } from "@everylab/db/schema";
+import { eq, sql } from "@everylab/db";
+import { cloudPhone, tiktokAccount } from "@everylab/db/schema";
 import {
   GeeLarkClient,
   geelarkEnv,
-  type CloudPhone,
 } from "@everylab/geelark";
 
 import { adminProcedure } from "../trpc";
@@ -24,69 +23,27 @@ function getGeeLarkClient() {
   });
 }
 
-export interface CloudPhoneWithAccount extends CloudPhone {
-  linkedTiktokAccount: {
-    id: string;
-    name: string;
-    tiktokUsername: string;
-  } | null;
-}
-
 export const cloudPhoneRouter = {
   /**
-   * List all cloud phones from GeeLark API
-   * Includes linked TikTok account info from local database
+   * List all cloud phones from database cache
+   * Includes linked TikTok account info
    */
-  list: adminProcedure
-    .input(
-      z
-        .object({
-          page: z.number().min(1).optional(),
-          pageSize: z.number().min(1).max(100).optional(),
-        })
-        .optional()
-    )
-    .query(async ({ ctx, input }) => {
-      const client = getGeeLarkClient();
-
-      // Fetch cloud phones from GeeLark
-      const response = await client.listCloudPhones({
-        page: input?.page ?? 1,
-        pageSize: input?.pageSize ?? 100,
-      });
-
-      // Get all TikTok accounts with their geelarkEnvId
-      const accounts = await ctx.db.query.tiktokAccount.findMany({
-        columns: {
-          id: true,
-          name: true,
-          tiktokUsername: true,
-          geelarkEnvId: true,
+  list: adminProcedure.query(async ({ ctx }) => {
+    const phones = await ctx.db.query.cloudPhone.findMany({
+      orderBy: (cp, { desc }) => desc(cp.lastSyncedAt),
+      with: {
+        tiktokAccounts: {
+          columns: {
+            id: true,
+            name: true,
+            tiktokUsername: true,
+          },
         },
-      });
+      },
+    });
 
-      // Create a map of envId -> account for fast lookup
-      const accountsByEnvId = new Map(
-        accounts
-          .filter((a) => a.geelarkEnvId)
-          .map((a) => [a.geelarkEnvId!, a])
-      );
-
-      // Enrich cloud phones with linked account info
-      const cloudPhonesWithAccounts: CloudPhoneWithAccount[] = response.items.map(
-        (phone) => ({
-          ...phone,
-          linkedTiktokAccount: accountsByEnvId.get(phone.id) ?? null,
-        })
-      );
-
-      return {
-        total: response.total,
-        page: response.page,
-        pageSize: response.pageSize,
-        items: cloudPhonesWithAccounts,
-      };
-    }),
+    return phones;
+  }),
 
   /**
    * Get a single cloud phone by ID
@@ -94,34 +51,73 @@ export const cloudPhoneRouter = {
   byId: adminProcedure
     .input(z.object({ id: z.string() }))
     .query(async ({ ctx, input }) => {
-      const client = getGeeLarkClient();
-
-      // Fetch the specific phone
-      const response = await client.listCloudPhones({
-        page: 1,
-        pageSize: 1,
-      });
-
-      const phone = response.items.find((p) => p.id === input.id);
-      if (!phone) {
-        return null;
-      }
-
-      // Check if linked to a TikTok account
-      const account = await ctx.db.query.tiktokAccount.findFirst({
-        where: eq(tiktokAccount.geelarkEnvId, input.id),
-        columns: {
-          id: true,
-          name: true,
-          tiktokUsername: true,
+      const phone = await ctx.db.query.cloudPhone.findFirst({
+        where: eq(cloudPhone.id, input.id),
+        with: {
+          tiktokAccounts: {
+            columns: {
+              id: true,
+              name: true,
+              tiktokUsername: true,
+            },
+          },
         },
       });
 
-      return {
-        ...phone,
-        linkedTiktokAccount: account ?? null,
-      };
+      return phone;
     }),
+
+  /**
+   * Sync cloud phones from GeeLark API to local database
+   */
+  sync: adminProcedure.mutation(async ({ ctx }) => {
+    const client = getGeeLarkClient();
+
+    // Fetch all cloud phones from GeeLark
+    const response = await client.listCloudPhones({
+      page: 1,
+      pageSize: 100,
+    });
+
+    const now = new Date();
+    let upsertedCount = 0;
+
+    // Upsert each phone into the database
+    for (const phone of response.items) {
+      await ctx.db
+        .insert(cloudPhone)
+        .values({
+          id: phone.id,
+          serialNo: phone.serialNo,
+          serialName: phone.serialName,
+          status: phone.status,
+          proxyServer: phone.proxy?.server,
+          proxyPort: phone.proxy?.port,
+          countryName: phone.equipmentInfo?.countryName,
+          lastSyncedAt: now,
+        })
+        .onConflictDoUpdate({
+          target: cloudPhone.id,
+          set: {
+            serialNo: phone.serialNo,
+            serialName: phone.serialName,
+            status: phone.status,
+            proxyServer: phone.proxy?.server,
+            proxyPort: phone.proxy?.port,
+            countryName: phone.equipmentInfo?.countryName,
+            lastSyncedAt: now,
+            updatedAt: sql`now()`,
+          },
+        });
+      upsertedCount++;
+    }
+
+    return {
+      synced: upsertedCount,
+      total: response.total,
+      syncedAt: now,
+    };
+  }),
 
   /**
    * Link a cloud phone to a TikTok account
@@ -134,10 +130,11 @@ export const cloudPhoneRouter = {
       })
     )
     .mutation(async ({ ctx, input }) => {
-      // Update the TikTok account with the GeeLark env ID
+      // Update the TikTok account with the cloud phone ID
+      // Explicitly set updatedAt to avoid $onUpdateFn serialization issues
       const [updated] = await ctx.db
         .update(tiktokAccount)
-        .set({ geelarkEnvId: input.cloudPhoneId })
+        .set({ cloudPhoneId: input.cloudPhoneId, updatedAt: new Date() })
         .where(eq(tiktokAccount.id, input.tiktokAccountId))
         .returning();
 
@@ -150,9 +147,10 @@ export const cloudPhoneRouter = {
   unlinkFromAccount: adminProcedure
     .input(z.object({ tiktokAccountId: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {
+      // Explicitly set updatedAt to avoid $onUpdateFn serialization issues
       const [updated] = await ctx.db
         .update(tiktokAccount)
-        .set({ geelarkEnvId: null })
+        .set({ cloudPhoneId: null, updatedAt: new Date() })
         .where(eq(tiktokAccount.id, input.tiktokAccountId))
         .returning();
 

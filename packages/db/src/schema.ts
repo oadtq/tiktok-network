@@ -1,4 +1,4 @@
-import { relations, sql } from "drizzle-orm";
+import { relations } from "drizzle-orm";
 import { pgEnum, pgTable } from "drizzle-orm/pg-core";
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import { z } from "zod/v4";
@@ -34,6 +34,29 @@ export * from "./auth-schema";
 import { user as authUser } from "./auth-schema";
 
 // ============================================================================
+// CLOUD PHONES (cached from GeeLark API)
+// ============================================================================
+
+export const cloudPhone = pgTable("cloud_phone", (t) => ({
+  id: t.varchar({ length: 256 }).notNull().primaryKey(), // GeeLark envId
+  serialNo: t.varchar({ length: 256 }),
+  serialName: t.varchar({ length: 256 }),
+  status: t.integer().default(0), // 0=running, 1=starting, 2=stopped
+  proxyServer: t.varchar({ length: 256 }),
+  proxyPort: t.integer(),
+  countryName: t.varchar({ length: 256 }),
+  lastSyncedAt: t.timestamp({ mode: "date", withTimezone: true }).defaultNow(),
+  createdAt: t.timestamp({ mode: "date", withTimezone: true }).defaultNow().notNull(),
+  updatedAt: t
+    .timestamp({ mode: "date", withTimezone: true })
+    .$onUpdateFn(() => new Date()),
+}));
+
+export const cloudPhoneRelations = relations(cloudPhone, ({ many }) => ({
+  tiktokAccounts: many(tiktokAccount),
+}));
+
+// ============================================================================
 // TIKTOK ACCOUNTS (managed accounts for publishing)
 // ============================================================================
 
@@ -42,20 +65,27 @@ export const tiktokAccount = pgTable("tiktok_account", (t) => ({
   name: t.varchar({ length: 256 }).notNull(), // Display name
   tiktokUsername: t.varchar({ length: 256 }).notNull().unique(),
   tiktokUserId: t.varchar({ length: 256 }), // TikTok's user ID
-  geelarkEnvId: t.varchar({ length: 256 }), // GeeLark cloud phone ID for publishing
+  cloudPhoneId: t
+    .varchar({ length: 256 })
+    .references(() => cloudPhone.id, { onDelete: "set null" }), // Reference to cached cloud phone
   accessToken: t.text(), // OAuth token for API
   refreshToken: t.text(),
-  tokenExpiresAt: t.timestamp(),
+  tokenExpiresAt: t.timestamp({ mode: "date", withTimezone: true }),
   followerCount: t.integer().default(0),
   isActive: t.boolean().default(true).notNull(),
-  createdAt: t.timestamp().defaultNow().notNull(),
+  createdAt: t.timestamp({ mode: "date", withTimezone: true }).defaultNow().notNull(),
   updatedAt: t
     .timestamp({ mode: "date", withTimezone: true })
-    .$onUpdateFn(() => sql`now()`),
+    .$onUpdateFn(() => new Date()),
 }));
 
-export const tiktokAccountRelations = relations(tiktokAccount, ({ many }) => ({
+export const tiktokAccountRelations = relations(tiktokAccount, ({ one, many }) => ({
+  cloudPhone: one(cloudPhone, {
+    fields: [tiktokAccount.cloudPhoneId],
+    references: [cloudPhone.id],
+  }),
   clips: many(clip),
+  userTiktokAccounts: many(userTiktokAccount),
 }));
 
 // ============================================================================
@@ -80,16 +110,16 @@ export const clip = pgTable("clip", (t) => ({
     .uuid()
     .references(() => tiktokAccount.id, { onDelete: "set null" }),
   status: clipStatusEnum("status").default("draft").notNull(),
-  scheduledAt: t.timestamp({ withTimezone: true }),
-  publishedAt: t.timestamp({ withTimezone: true }),
+  scheduledAt: t.timestamp({ mode: "date", withTimezone: true }),
+  publishedAt: t.timestamp({ mode: "date", withTimezone: true }),
   tiktokVideoId: t.varchar({ length: 256 }), // TikTok's video ID after publishing
   tiktokVideoUrl: t.text(), // URL to the published TikTok
   geelarkTaskId: t.varchar({ length: 256 }), // GeeLark task ID for tracking publish job
   // Metadata
-  createdAt: t.timestamp().defaultNow().notNull(),
+  createdAt: t.timestamp({ mode: "date", withTimezone: true }).defaultNow().notNull(),
   updatedAt: t
     .timestamp({ mode: "date", withTimezone: true })
-    .$onUpdateFn(() => sql`now()`),
+    .$onUpdateFn(() => new Date()),
 }));
 
 export const clipRelations = relations(clip, ({ one, many }) => ({
@@ -121,7 +151,7 @@ export const clipStats = pgTable("clip_stats", (t) => ({
   comments: t.integer().default(0).notNull(),
   shares: t.integer().default(0).notNull(),
   // Timestamp for this snapshot
-  recordedAt: t.timestamp().defaultNow().notNull(),
+  recordedAt: t.timestamp({ mode: "date", withTimezone: true }).defaultNow().notNull(),
 }));
 
 export const clipStatsRelations = relations(clipStats, ({ one }) => ({
@@ -141,13 +171,13 @@ export const campaign = pgTable("campaign", (t) => ({
   description: t.text(),
   status: campaignStatusEnum("status").default("draft").notNull(),
   // Timeline
-  startDate: t.timestamp({ withTimezone: true }),
-  endDate: t.timestamp({ withTimezone: true }),
+  startDate: t.timestamp({ mode: "date", withTimezone: true }),
+  endDate: t.timestamp({ mode: "date", withTimezone: true }),
   // Metadata
-  createdAt: t.timestamp().defaultNow().notNull(),
+  createdAt: t.timestamp({ mode: "date", withTimezone: true }).defaultNow().notNull(),
   updatedAt: t
     .timestamp({ mode: "date", withTimezone: true })
-    .$onUpdateFn(() => sql`now()`),
+    .$onUpdateFn(() => new Date()),
 }));
 
 export const campaignRelations = relations(campaign, ({ many }) => ({
@@ -169,7 +199,7 @@ export const campaignClip = pgTable("campaign_clip", (t) => ({
     .notNull()
     .references(() => clip.id, { onDelete: "cascade" }),
   // Metadata
-  createdAt: t.timestamp().defaultNow().notNull(),
+  createdAt: t.timestamp({ mode: "date", withTimezone: true }).defaultNow().notNull(),
 }));
 
 export const campaignClipRelations = relations(campaignClip, ({ one }) => ({
@@ -197,7 +227,7 @@ export const userTiktokAccount = pgTable("user_tiktok_account", (t) => ({
     .uuid()
     .notNull()
     .references(() => tiktokAccount.id, { onDelete: "cascade" }),
-  createdAt: t.timestamp().defaultNow().notNull(),
+  createdAt: t.timestamp({ mode: "date", withTimezone: true }).defaultNow().notNull(),
 }));
 
 export const userTiktokAccountRelations = relations(userTiktokAccount, ({ one }) => ({
@@ -215,6 +245,9 @@ export const userTiktokAccountRelations = relations(userTiktokAccount, ({ one })
 // ZOD SCHEMAS (for validation)
 // ============================================================================
 
+// Cloud Phone
+export const SelectCloudPhoneSchema = createSelectSchema(cloudPhone);
+
 // TikTok Account
 export const CreateTiktokAccountSchema = createInsertSchema(tiktokAccount, {
   name: z.string().min(1).max(256),
@@ -224,6 +257,8 @@ export const CreateTiktokAccountSchema = createInsertSchema(tiktokAccount, {
   createdAt: true,
   updatedAt: true,
 });
+
+export const UpdateTiktokAccountSchema = CreateTiktokAccountSchema.partial();
 
 export const SelectTiktokAccountSchema = createSelectSchema(tiktokAccount);
 

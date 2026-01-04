@@ -284,8 +284,28 @@ export function AdminDashboardContent({ user }: AdminDashboardContentProps) {
 
         {/* Navigation */}
         <nav className="flex-1 space-y-1 p-4">
-          <NavItem icon={Home} label="Dashboard" active href="/admin" badge={pendingClips.length} />
-          <NavItem icon={BarChart3} label="Statistics" href="/admin/statistics" />
+          <NavItem
+            icon={Home}
+            label="Dashboard"
+            active
+            href="/admin"
+          />
+          <NavItem icon={Smartphone} label="Cloud Phones" href="/admin/cloud-phones" />
+          <NavItem icon={Video} label="TikTok Accounts" href="/admin/tiktok-accounts" />
+          <NavItem icon={Users} label="Users" href="/admin/users" />
+          <NavItem
+            icon={FileVideo}
+            label="All Clips"
+            href="/admin/clips"
+          />
+          <NavItem
+            icon={Clock}
+            label="Pending Review"
+            href="/admin/pending"
+            badge={pendingClips.length}
+          />
+          <NavItem icon={Megaphone} label="Campaigns" href="/admin/campaigns" />
+          <NavItem icon={BarChart3} label="Analytics" href="/admin/analytics" />
 
           <div className="my-4 border-t border-border" />
 
