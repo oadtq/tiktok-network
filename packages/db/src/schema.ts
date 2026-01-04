@@ -78,7 +78,7 @@ export const clip = pgTable("clip", (t) => ({
   tiktokAccountId: t
     .uuid()
     .references(() => tiktokAccount.id, { onDelete: "set null" }),
-  status: clipStatusEnum().default("draft").notNull(),
+  status: clipStatusEnum("status").default("draft").notNull(),
   scheduledAt: t.timestamp({ withTimezone: true }),
   publishedAt: t.timestamp({ withTimezone: true }),
   tiktokVideoId: t.varchar({ length: 256 }), // TikTok's video ID after publishing
@@ -137,7 +137,7 @@ export const campaign = pgTable("campaign", (t) => ({
   id: t.uuid().notNull().primaryKey().defaultRandom(),
   name: t.varchar({ length: 256 }).notNull(),
   description: t.text(),
-  status: campaignStatusEnum().default("draft").notNull(),
+  status: campaignStatusEnum("status").default("draft").notNull(),
   // Timeline
   startDate: t.timestamp({ withTimezone: true }),
   endDate: t.timestamp({ withTimezone: true }),

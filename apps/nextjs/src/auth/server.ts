@@ -18,8 +18,8 @@ const baseUrl =
 export const auth = initAuth({
   baseUrl,
   secret: env.AUTH_SECRET,
-  googleClientId: env.AUTH_GOOGLE_ID as string | undefined,
-  googleClientSecret: env.AUTH_GOOGLE_SECRET as string | undefined,
+  googleClientId: env.AUTH_GOOGLE_ID,
+  googleClientSecret: env.AUTH_GOOGLE_SECRET,
   extraPlugins: [nextCookies()],
 });
 

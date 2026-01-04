@@ -198,6 +198,9 @@ importers:
       '@everylab/db':
         specifier: workspace:*
         version: link:../db
+      '@everylab/storage':
+        specifier: workspace:*
+        version: link:../storage
       '@everylab/validators':
         specifier: workspace:*
         version: link:../validators

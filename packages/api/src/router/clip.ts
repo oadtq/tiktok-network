@@ -10,9 +10,9 @@ import { desc, eq } from "@everylab/db";
 import {
   clip,
   clipStats,
-  CreateClipSchema,
   UpdateClipSchema,
 } from "@everylab/db/schema";
+import { createStorageFromEnv } from "@everylab/storage";
 
 import { protectedProcedure } from "../trpc";
 
@@ -26,7 +26,47 @@ function generateMockStats() {
   };
 }
 
+// Get video content type from filename
+function getVideoContentType(filename: string): string {
+  const ext = filename.split(".").pop()?.toLowerCase();
+  const contentTypes: Record<string, string> = {
+    mp4: "video/mp4",
+    webm: "video/webm",
+    mov: "video/quicktime",
+    avi: "video/x-msvideo",
+    mkv: "video/x-matroska",
+  };
+  return contentTypes[ext ?? ""] ?? "video/mp4";
+}
+
 export const clipRouter = {
+  /**
+   * Get a presigned URL for uploading a video to S3
+   */
+  getPresignedUploadUrl: protectedProcedure
+    .input(
+      z.object({
+        filename: z.string().min(1),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const storage = createStorageFromEnv();
+      const key = storage.generateKey(`clips/${ctx.session.user.id}`, input.filename);
+      const contentType = getVideoContentType(input.filename);
+      
+      const result = await storage.getPresignedUploadUrl(key, contentType, 3600);
+      const publicUrl = storage.getPublicUrl(key);
+      
+      console.log(`[Clip] Generated presigned upload URL for user ${ctx.session.user.id}, key: ${key}`);
+      
+      return {
+        uploadUrl: result.url,
+        key,
+        publicUrl,
+        expiresAt: result.expiresAt,
+      };
+    }),
+
   /**
    * Get all clips for the current user
    */
@@ -76,19 +116,31 @@ export const clipRouter = {
     }),
 
   /**
-   * Create a new clip
+   * Create a new clip and submit for review
    */
   create: protectedProcedure
-    .input(CreateClipSchema)
+    .input(
+      z.object({
+        title: z.string().min(1).max(256),
+        description: z.string().optional(),
+        videoUrl: z.url(),
+        scheduledAt: z.date().optional(),
+      })
+    )
     .mutation(async ({ ctx, input }) => {
       const [newClip] = await ctx.db
         .insert(clip)
         .values({
-          ...input,
+          title: input.title,
+          description: input.description,
+          videoUrl: input.videoUrl,
+          scheduledAt: input.scheduledAt,
           userId: ctx.session.user.id,
-          status: "draft",
+          status: "submitted", // Auto-submit for review
         })
         .returning();
+
+      console.log(`[Clip] Created clip ${newClip?.id} for user ${ctx.session.user.id}, status: submitted`);
 
       return newClip;
     }),
