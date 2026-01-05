@@ -8,6 +8,7 @@ import {
   ArrowLeft,
   Check,
   FileVideo,
+  FolderOpen,
   Video,
   X,
 } from "lucide-react";
@@ -49,15 +50,23 @@ export function UploadContent({ user }: UploadContentProps) {
     description: "",
     tiktokAccountId: "",
     scheduledAt: "",
+    selectedFromLibrary: false,
+    selectedClipId: null,
   });
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [showLibrary, setShowLibrary] = useState(false);
 
   const trpc = useTRPC();
   const queryClient = useQueryClient();
 
   const { data: tiktokAccounts } = useQuery(
     trpc.upload.myTiktokAccounts.queryOptions()
+  );
+
+  // Fetch user's clips for library selection
+  const { data: userClips } = useQuery(
+    trpc.clip.list.queryOptions(undefined)
   );
 
   const presignedUrlMutation = useMutation(
@@ -261,72 +270,186 @@ export function UploadContent({ user }: UploadContentProps) {
             {step === "upload" && (
               <div className="rounded-xl border border-border bg-card p-8">
                 <h2 className="mb-6 text-lg font-semibold text-foreground">
-                  Select Video File
+                  Select Video
                 </h2>
 
-                {!uploadState.file ? (
-                  <label className="flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-border bg-muted/30 p-12 transition-colors hover:border-primary/50 hover:bg-muted/50">
-                    <FileVideo className="mb-4 size-12 text-muted-foreground" />
-                    <p className="mb-2 text-sm font-medium text-foreground">
-                      Click to upload or drag and drop
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      MP4, WebM, MOV, AVI, or MKV (max 500MB)
-                    </p>
-                    <input
-                      type="file"
-                      accept=".mp4,.webm,.mov,.avi,.mkv"
-                      onChange={handleFileSelect}
-                      className="hidden"
-                    />
-                  </label>
-                ) : (
-                  <div className="space-y-4">
-                    <div className="flex items-center gap-4 rounded-lg border border-border p-4">
-                      <div className="flex size-12 items-center justify-center rounded-lg bg-primary/10">
-                        <Video className="size-6 text-primary" />
-                      </div>
-                      <div className="flex-1">
-                        <p className="font-medium text-foreground">
-                          {uploadState.file.name}
-                        </p>
-                        <p className="text-sm text-muted-foreground">
-                          {(uploadState.file.size / 1024 / 1024).toFixed(2)} MB
-                        </p>
-                      </div>
-                      <button
-                        onClick={() =>
-                          setUploadState((prev) => ({ ...prev, file: null }))
-                        }
-                        className="rounded-lg p-2 text-muted-foreground hover:bg-accent hover:text-foreground"
-                      >
-                        <X className="size-4" />
-                      </button>
-                    </div>
+                {/* Toggle between upload and library */}
+                <div className="mb-6 flex gap-2">
+                  <button
+                    onClick={() => setShowLibrary(false)}
+                    className={`flex-1 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors ${
+                      !showLibrary
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-muted text-muted-foreground hover:bg-accent"
+                    }`}
+                  >
+                    <Upload className="mr-2 inline size-4" />
+                    Upload New
+                  </button>
+                  <button
+                    onClick={() => setShowLibrary(true)}
+                    className={`flex-1 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors ${
+                      showLibrary
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-muted text-muted-foreground hover:bg-accent"
+                    }`}
+                  >
+                    <FolderOpen className="mr-2 inline size-4" />
+                    Select from Library
+                  </button>
+                </div>
 
-                    {isUploading && (
-                      <div className="space-y-2">
-                        <div className="flex justify-between text-sm">
-                          <span className="text-muted-foreground">Uploading...</span>
-                          <span className="font-medium text-foreground">{uploadProgress}%</span>
+                {/* Library Selection */}
+                {showLibrary ? (
+                  <div className="space-y-4">
+                    {!userClips || userClips.length === 0 ? (
+                      <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-border bg-muted/30 p-8">
+                        <Video className="mb-2 size-8 text-muted-foreground" />
+                        <p className="text-sm text-muted-foreground">
+                          No previously uploaded videos
+                        </p>
+                      </div>
+                    ) : uploadState.selectedFromLibrary && uploadState.selectedClipId ? (
+                      <div className="space-y-4">
+                        <div className="flex items-center gap-4 rounded-lg border border-primary bg-primary/5 p-4">
+                          <div className="flex size-12 items-center justify-center rounded-lg bg-primary/10">
+                            <Video className="size-6 text-primary" />
+                          </div>
+                          <div className="flex-1">
+                            <p className="font-medium text-foreground">
+                              {uploadState.title}
+                            </p>
+                            <p className="text-sm text-muted-foreground">
+                              Selected from library
+                            </p>
+                          </div>
+                          <button
+                            onClick={() =>
+                              setUploadState((prev) => ({
+                                ...prev,
+                                selectedFromLibrary: false,
+                                selectedClipId: null,
+                                videoUrl: null,
+                                title: "",
+                                description: "",
+                              }))
+                            }
+                            className="rounded-lg p-2 text-muted-foreground hover:bg-accent hover:text-foreground"
+                          >
+                            <X className="size-4" />
+                          </button>
                         </div>
-                        <div className="h-2 overflow-hidden rounded-full bg-muted">
-                          <div
-                            className="h-full bg-primary transition-all"
-                            style={{ width: `${uploadProgress}%` }}
-                          />
-                        </div>
+                        <Button
+                          onClick={() => setStep("details")}
+                          className="w-full"
+                        >
+                          Continue to Details
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="max-h-64 space-y-2 overflow-y-auto">
+                        {userClips.map((clip) => (
+                          <button
+                            key={clip.id}
+                            onClick={() => {
+                              setUploadState((prev) => ({
+                                ...prev,
+                                selectedFromLibrary: true,
+                                selectedClipId: clip.id,
+                                videoUrl: clip.videoUrl,
+                                title: clip.title,
+                                description: clip.description ?? "",
+                                tiktokAccountId: clip.tiktokAccountId ?? "",
+                              }));
+                            }}
+                            className="flex w-full items-center gap-3 rounded-lg border border-border p-3 text-left transition-colors hover:border-primary hover:bg-primary/5"
+                          >
+                            <div className="relative aspect-video w-20 overflow-hidden rounded bg-muted">
+                              <video
+                                src={clip.videoUrl}
+                                className="size-full object-cover"
+                                muted
+                              />
+                            </div>
+                            <div className="flex-1 overflow-hidden">
+                              <p className="truncate font-medium text-foreground">
+                                {clip.title}
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                {new Date(clip.createdAt).toLocaleDateString()}
+                              </p>
+                            </div>
+                          </button>
+                        ))}
                       </div>
                     )}
-
-                    <Button
-                      onClick={handleUpload}
-                      disabled={isUploading}
-                      className="w-full"
-                    >
-                      {isUploading ? "Uploading..." : "Upload & Continue"}
-                    </Button>
                   </div>
+                ) : (
+                  /* Upload New */
+                  !uploadState.file ? (
+                    <label className="flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-border bg-muted/30 p-12 transition-colors hover:border-primary/50 hover:bg-muted/50">
+                      <FileVideo className="mb-4 size-12 text-muted-foreground" />
+                      <p className="mb-2 text-sm font-medium text-foreground">
+                        Click to upload or drag and drop
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        MP4, WebM, MOV, AVI, or MKV (max 500MB)
+                      </p>
+                      <input
+                        type="file"
+                        accept=".mp4,.webm,.mov,.avi,.mkv"
+                        onChange={handleFileSelect}
+                        className="hidden"
+                      />
+                    </label>
+                  ) : (
+                    <div className="space-y-4">
+                      <div className="flex items-center gap-4 rounded-lg border border-border p-4">
+                        <div className="flex size-12 items-center justify-center rounded-lg bg-primary/10">
+                          <Video className="size-6 text-primary" />
+                        </div>
+                        <div className="flex-1">
+                          <p className="font-medium text-foreground">
+                            {uploadState.file.name}
+                          </p>
+                          <p className="text-sm text-muted-foreground">
+                            {(uploadState.file.size / 1024 / 1024).toFixed(2)} MB
+                          </p>
+                        </div>
+                        <button
+                          onClick={() =>
+                            setUploadState((prev) => ({ ...prev, file: null }))
+                          }
+                          className="rounded-lg p-2 text-muted-foreground hover:bg-accent hover:text-foreground"
+                        >
+                          <X className="size-4" />
+                        </button>
+                      </div>
+
+                      {isUploading && (
+                        <div className="space-y-2">
+                          <div className="flex justify-between text-sm">
+                            <span className="text-muted-foreground">Uploading...</span>
+                            <span className="font-medium text-foreground">{uploadProgress}%</span>
+                          </div>
+                          <div className="h-2 overflow-hidden rounded-full bg-muted">
+                            <div
+                              className="h-full bg-primary transition-all"
+                              style={{ width: `${uploadProgress}%` }}
+                            />
+                          </div>
+                        </div>
+                      )}
+
+                      <Button
+                        onClick={handleUpload}
+                        disabled={isUploading}
+                        className="w-full"
+                      >
+                        {isUploading ? "Uploading..." : "Upload & Continue"}
+                      </Button>
+                    </div>
+                  )
                 )}
               </div>
             )}

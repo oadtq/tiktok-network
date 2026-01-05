@@ -10,6 +10,7 @@ import { and, desc, eq, gte } from "@everylab/db";
 import {
   clip,
   clipStats,
+  clipStatusEnum,
   user,
 } from "@everylab/db/schema";
 import {
@@ -18,6 +19,9 @@ import {
 } from "@everylab/geelark";
 
 import { adminProcedure } from "../trpc";
+
+// Valid clip status values
+const clipStatusValues = clipStatusEnum.enumValues;
 
 // Create GeeLark client instance
 function getGeeLarkClient() {
@@ -194,7 +198,7 @@ export const adminRouter = {
   }),
 
   /**
-   * Get all pending clips for review
+   * Get all pending clips for review (backwards compatibility)
    */
   pendingClips: adminProcedure.query(async ({ ctx }) => {
     const pending = await ctx.db.query.clip.findMany({
@@ -209,6 +213,80 @@ export const adminRouter = {
     console.log(`[Admin] Found ${pending.length} pending clips`);
     return pending;
   }),
+
+  /**
+   * Get all submissions with optional status filter
+   */
+  submissions: adminProcedure
+    .input(
+      z.object({
+        status: z.enum(clipStatusValues).optional(),
+      }).optional()
+    )
+    .query(async ({ ctx, input }) => {
+      const whereClause = input?.status
+        ? eq(clip.status, input.status)
+        : undefined;
+
+      const submissions = await ctx.db.query.clip.findMany({
+        where: whereClause,
+        orderBy: desc(clip.createdAt),
+        with: {
+          user: true,
+          tiktokAccount: true,
+        },
+      });
+
+      console.log(`[Admin] Found ${submissions.length} submissions${input?.status ? ` with status: ${input.status}` : ""}`);
+      return submissions;
+    }),
+
+  /**
+   * Get all clips across all users for admin view
+   */
+  allClips: adminProcedure
+    .input(
+      z.object({
+        status: z.enum(clipStatusValues).optional(),
+        limit: z.number().min(1).max(100).default(50),
+        offset: z.number().min(0).default(0),
+      }).optional()
+    )
+    .query(async ({ ctx, input }) => {
+      const whereClause = input?.status
+        ? eq(clip.status, input.status)
+        : undefined;
+
+      const clips = await ctx.db.query.clip.findMany({
+        where: whereClause,
+        orderBy: desc(clip.createdAt),
+        limit: input?.limit ?? 50,
+        offset: input?.offset ?? 0,
+        with: {
+          user: true,
+          tiktokAccount: true,
+          stats: {
+            orderBy: desc(clipStats.recordedAt),
+            limit: 1,
+          },
+        },
+      });
+
+      // Get total count for pagination
+      const allClips = await ctx.db.query.clip.findMany({
+        where: whereClause,
+      });
+
+      console.log(`[Admin] Found ${allClips.length} total clips, returning ${clips.length}`);
+
+      return {
+        clips: clips.map((c) => ({
+          ...c,
+          latestStats: c.stats[0] ?? null,
+        })),
+        total: allClips.length,
+      };
+    }),
 
   /**
    * Approve a clip and trigger GeeLark publishing

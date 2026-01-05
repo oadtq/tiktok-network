@@ -6,15 +6,19 @@
 import type { TRPCRouterRecord } from "@trpc/server";
 import { z } from "zod/v4";
 
-import { desc, eq } from "@everylab/db";
+import { and, desc, eq } from "@everylab/db";
 import {
   clip,
   clipStats,
+  clipStatusEnum,
   UpdateClipSchema,
 } from "@everylab/db/schema";
 import { createStorageFromEnv } from "@everylab/storage";
 
 import { protectedProcedure } from "../trpc";
+
+// Valid clip status values
+const clipStatusValues = clipStatusEnum.enumValues;
 
 // Get video content type from filename
 function getVideoContentType(filename: string): string {
@@ -58,27 +62,67 @@ export const clipRouter = {
     }),
 
   /**
-   * Get all clips for the current user
+   * Get all clips for the current user with optional status filter
    */
-  list: protectedProcedure.query(async ({ ctx }) => {
-    const clips = await ctx.db.query.clip.findMany({
-      where: eq(clip.userId, ctx.session.user.id),
-      orderBy: desc(clip.createdAt),
-      with: {
-        tiktokAccount: true,
-        stats: {
-          orderBy: desc(clipStats.recordedAt),
-          limit: 1,
-        },
-      },
-    });
+  list: protectedProcedure
+    .input(
+      z.object({
+        status: z.enum(clipStatusValues).optional(),
+      }).optional()
+    )
+    .query(async ({ ctx, input }) => {
+      const whereClause = input?.status
+        ? and(eq(clip.userId, ctx.session.user.id), eq(clip.status, input.status))
+        : eq(clip.userId, ctx.session.user.id);
 
-    // Enhance with latest stats for display
-    return clips.map((c) => ({
-      ...c,
-      latestStats: c.stats[0] ?? null,
-    }));
-  }),
+      const clips = await ctx.db.query.clip.findMany({
+        where: whereClause,
+        orderBy: desc(clip.createdAt),
+        with: {
+          tiktokAccount: true,
+          stats: {
+            orderBy: desc(clipStats.recordedAt),
+            limit: 1,
+          },
+        },
+      });
+
+      // Enhance with latest stats for display
+      return clips.map((c) => ({
+        ...c,
+        latestStats: c.stats[0] ?? null,
+      }));
+    }),
+
+  /**
+   * Withdraw a submitted clip back to draft status
+   */
+  withdraw: protectedProcedure
+    .input(z.object({ id: z.string().uuid() }))
+    .mutation(async ({ ctx, input }) => {
+      // Verify ownership
+      const existing = await ctx.db.query.clip.findFirst({
+        where: eq(clip.id, input.id),
+      });
+
+      if (!existing || existing.userId !== ctx.session.user.id) {
+        throw new Error("Clip not found or access denied");
+      }
+
+      if (existing.status !== "submitted") {
+        throw new Error("Only submitted clips can be withdrawn");
+      }
+
+      const [updated] = await ctx.db
+        .update(clip)
+        .set({ status: "draft" })
+        .where(eq(clip.id, input.id))
+        .returning();
+
+      console.log(`[Clip] Withdrawn clip ${input.id} back to draft`);
+
+      return updated;
+    }),
 
   /**
    * Get a single clip by ID (must belong to current user)
