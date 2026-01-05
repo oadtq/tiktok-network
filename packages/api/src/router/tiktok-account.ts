@@ -7,19 +7,34 @@ import type { TRPCRouterRecord } from "@trpc/server";
 import { z } from "zod/v4";
 
 import { desc, eq } from "@everylab/db";
-import { CreateTiktokAccountSchema, tiktokAccount } from "@everylab/db/schema";
+import {
+  CreateTiktokAccountSchema,
+  tiktokAccount,
+  UpdateTiktokAccountSchema,
+} from "@everylab/db/schema";
 
 import { adminProcedure, protectedProcedure } from "../trpc";
 
 export const tiktokAccountRouter = {
   /**
-   * List all TikTok accounts (admin only - includes tokens)
+   * List all TikTok accounts with linked cloud phone and users (admin only)
    */
   list: adminProcedure.query(async ({ ctx }) => {
     return ctx.db.query.tiktokAccount.findMany({
       orderBy: desc(tiktokAccount.createdAt),
       with: {
-        clips: true,
+        cloudPhone: true,
+        userTiktokAccounts: {
+          with: {
+            user: {
+              columns: {
+                id: true,
+                name: true,
+                email: true,
+              },
+            },
+          },
+        },
       },
     });
   }),
@@ -52,6 +67,18 @@ export const tiktokAccountRouter = {
       return ctx.db.query.tiktokAccount.findFirst({
         where: eq(tiktokAccount.id, input.id),
         with: {
+          cloudPhone: true,
+          userTiktokAccounts: {
+            with: {
+              user: {
+                columns: {
+                  id: true,
+                  name: true,
+                  email: true,
+                },
+              },
+            },
+          },
           clips: {
             orderBy: desc(tiktokAccount.createdAt),
             limit: 20,
@@ -81,14 +108,34 @@ export const tiktokAccountRouter = {
     .input(
       z.object({
         id: z.string().uuid(),
-        data: CreateTiktokAccountSchema.partial(),
+        data: UpdateTiktokAccountSchema,
       })
     )
     .mutation(async ({ ctx, input }) => {
       const [updated] = await ctx.db
         .update(tiktokAccount)
-        .set(input.data)
+        .set({ ...input.data, updatedAt: new Date() })
         .where(eq(tiktokAccount.id, input.id))
+        .returning();
+
+      return updated;
+    }),
+
+  /**
+   * Assign a TikTok account to a cloud phone
+   */
+  assignToCloudPhone: adminProcedure
+    .input(
+      z.object({
+        tiktokAccountId: z.string().uuid(),
+        cloudPhoneId: z.string().nullable(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const [updated] = await ctx.db
+        .update(tiktokAccount)
+        .set({ cloudPhoneId: input.cloudPhoneId, updatedAt: new Date() })
+        .where(eq(tiktokAccount.id, input.tiktokAccountId))
         .returning();
 
       return updated;
@@ -110,7 +157,7 @@ export const tiktokAccountRouter = {
 
       const [updated] = await ctx.db
         .update(tiktokAccount)
-        .set({ isActive: !existing.isActive })
+        .set({ isActive: !existing.isActive, updatedAt: new Date() })
         .where(eq(tiktokAccount.id, input.id))
         .returning();
 

@@ -95,6 +95,12 @@ importers:
 
   apps/nextjs:
     dependencies:
+      '@aws-sdk/client-s3':
+        specifier: ^3.700.0
+        version: 3.958.0
+      '@aws-sdk/s3-request-presigner':
+        specifier: ^3.700.0
+        version: 3.958.0
       '@everylab/api':
         specifier: workspace:*
         version: link:../../packages/api

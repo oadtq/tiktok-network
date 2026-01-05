@@ -295,7 +295,7 @@ export function UsersContent({ user }: UsersContentProps) {
                       @{account.tiktokUsername}
                     </p>
                   </div>
-                  {account.geelarkEnvId && (
+                  {account.cloudPhoneId && (
                     <div className="ml-auto flex items-center gap-1 text-xs text-emerald-600">
                       <Link2 className="size-3" />
                       Cloud Phone

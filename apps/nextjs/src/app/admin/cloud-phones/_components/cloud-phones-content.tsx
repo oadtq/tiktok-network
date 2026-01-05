@@ -52,6 +52,14 @@ export function CloudPhonesContent({ user }: CloudPhonesContentProps) {
     trpc.tiktokAccount.list.queryOptions()
   );
 
+  const syncMutation = useMutation(
+    trpc.cloudPhone.sync.mutationOptions({
+      onSuccess: () => {
+        void queryClient.invalidateQueries({ queryKey: trpc.cloudPhone.list.queryKey() });
+      },
+    })
+  );
+
   const linkMutation = useMutation(
     trpc.cloudPhone.linkToAccount.mutationOptions({
       onSuccess: () => {
@@ -145,6 +153,14 @@ export function CloudPhonesContent({ user }: CloudPhonesContentProps) {
                 <RefreshCw className={`size-4 ${isLoading ? "animate-spin" : ""}`} />
                 Refresh
               </Button>
+              <Button
+                className="gap-2"
+                onClick={() => syncMutation.mutate()}
+                disabled={syncMutation.isPending}
+              >
+                <RefreshCw className={`size-4 ${syncMutation.isPending ? "animate-spin" : ""}`} />
+                Sync from GeeLark
+              </Button>
             </div>
           </div>
         </header>
@@ -181,7 +197,7 @@ export function CloudPhonesContent({ user }: CloudPhonesContentProps) {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border">
-                    {cloudPhones?.items.map((phone) => (
+                    {cloudPhones?.map((phone) => (
                       <tr
                         key={phone.id}
                         className="group transition-colors hover:bg-muted/30"
@@ -204,18 +220,18 @@ export function CloudPhonesContent({ user }: CloudPhonesContentProps) {
                         <td className="px-6 py-4">
                           <span
                             className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${
-                              statusConfig[phone.status]?.color ?? "bg-gray-100 text-gray-600"
+                              statusConfig[phone.status ?? 0]?.color ?? "bg-gray-100 text-gray-600"
                             }`}
                           >
-                            {statusConfig[phone.status]?.label ?? "Unknown"}
+                            {statusConfig[phone.status ?? 0]?.label ?? "Unknown"}
                           </span>
                         </td>
                         <td className="px-6 py-4">
-                          {phone.proxy.server ? (
+                          {phone.proxyServer ? (
                             <div className="flex items-center gap-2">
                               <Wifi className="size-4 text-muted-foreground" />
                               <span className="text-sm text-foreground">
-                                {phone.proxy.server}:{phone.proxy.port}
+                                {phone.proxyServer}:{phone.proxyPort}
                               </span>
                             </div>
                           ) : (
@@ -224,23 +240,22 @@ export function CloudPhonesContent({ user }: CloudPhonesContentProps) {
                         </td>
                         <td className="px-6 py-4">
                           <span className="text-sm text-foreground">
-                            {phone.equipmentInfo.countryName}
+                            {phone.countryName ?? "Unknown"}
                           </span>
                         </td>
                         <td className="px-6 py-4">
-                          {phone.linkedTiktokAccount ? (
+                          {phone.tiktokAccounts.length > 0 ? (
                             <div className="flex items-center gap-2">
                               <div className="flex size-6 items-center justify-center rounded-full bg-primary/10">
                                 <Check className="size-3 text-primary" />
                               </div>
                               <span className="text-sm font-medium text-foreground">
-                                @{phone.linkedTiktokAccount.tiktokUsername}
+                                @{phone.tiktokAccounts[0]?.tiktokUsername}
                               </span>
                               <button
                                 onClick={() => {
-                                  if (phone.linkedTiktokAccount) {
-                                    handleUnlink(phone.linkedTiktokAccount.id);
-                                  }
+                                  const account = phone.tiktokAccounts[0];
+                                  if (account) handleUnlink(account.id);
                                 }}
                                 className="ml-2 rounded p-1 text-muted-foreground hover:bg-red-50 hover:text-red-600"
                                 title="Unlink account"
@@ -253,7 +268,7 @@ export function CloudPhonesContent({ user }: CloudPhonesContentProps) {
                           )}
                         </td>
                         <td className="px-6 py-4 text-right">
-                          {!phone.linkedTiktokAccount && (
+                          {phone.tiktokAccounts.length === 0 && (
                             <Button
                               variant="outline"
                               size="sm"
@@ -267,7 +282,7 @@ export function CloudPhonesContent({ user }: CloudPhonesContentProps) {
                         </td>
                       </tr>
                     ))}
-                    {(!cloudPhones?.items || cloudPhones.items.length === 0) && (
+                    {(!cloudPhones || cloudPhones.length === 0) && (
                       <tr>
                         <td colSpan={6} className="px-6 py-12 text-center">
                           <Smartphone className="mx-auto size-12 text-muted-foreground/50" />
@@ -302,7 +317,7 @@ export function CloudPhonesContent({ user }: CloudPhonesContentProps) {
             </div>
             <div className="space-y-2">
               {tiktokAccounts
-                ?.filter((a) => !a.geelarkEnvId)
+                ?.filter((a) => !a.cloudPhoneId)
                 .map((account) => (
                   <button
                     key={account.id}
@@ -320,7 +335,7 @@ export function CloudPhonesContent({ user }: CloudPhonesContentProps) {
                     </div>
                   </button>
                 ))}
-              {tiktokAccounts?.filter((a) => !a.geelarkEnvId).length === 0 && (
+              {tiktokAccounts?.filter((a) => !a.cloudPhoneId).length === 0 && (
                 <p className="py-4 text-center text-sm text-muted-foreground">
                   All TikTok accounts are already linked
                 </p>

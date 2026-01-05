@@ -83,7 +83,7 @@ export const uploadRouter = {
             id: true,
             name: true,
             tiktokUsername: true,
-            geelarkEnvId: true,
+            cloudPhoneId: true,
             isActive: true,
           },
         },
@@ -93,6 +93,6 @@ export const uploadRouter = {
     // Filter to only accounts with cloud phone linked (required for publishing)
     return links
       .map((l) => l.tiktokAccount)
-      .filter((a) => a.isActive && a.geelarkEnvId);
+      .filter((a) => a.isActive && a.cloudPhoneId);
   }),
 } satisfies TRPCRouterRecord;
