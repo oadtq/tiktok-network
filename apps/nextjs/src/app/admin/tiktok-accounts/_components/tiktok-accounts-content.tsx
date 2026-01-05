@@ -1,30 +1,30 @@
 "use client";
 
-import { useState, useEffect, useRef, Fragment } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   AlertCircle,
   Check,
+  ChevronDown,
+  ChevronRight,
+  ChevronUp,
   Edit,
   ExternalLink,
+  Heart,
   LayoutDashboard,
   Link2,
+  MessageCircle,
+  Play,
   Plus,
   RefreshCw,
+  Share2,
   Smartphone,
   Trash2,
-  Video,
-  ChevronDown,
-  ChevronUp,
-  ChevronRight,
-  Heart,
-  MessageCircle,
-  Share2,
-  Play,
   UserPlus,
   Users,
+  Video,
   X,
 } from "lucide-react";
 
@@ -32,10 +32,10 @@ import { Button } from "@everylab/ui/button";
 import { Input } from "@everylab/ui/input";
 import { Label } from "@everylab/ui/label";
 
-import { useTRPC } from "~/trpc/react";
-import { Sidebar } from "~/components/sidebar";
 import type { NavItem } from "~/components/sidebar";
+import { Sidebar } from "~/components/sidebar";
 import { adminNavItems } from "~/config/navigation";
+import { useTRPC } from "~/trpc/react";
 
 interface User {
   id: string;
@@ -58,11 +58,13 @@ export function TikTokAccountsContent({ user }: TikTokAccountsContentProps) {
   const [connectError, setConnectError] = useState<string | null>(null);
   const [connectSuccess, setConnectSuccess] = useState<string | null>(null);
 
-  // Manual CRUD states  
+  // Manual CRUD states
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
-  const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null);
+  const [selectedAccountId, setSelectedAccountId] = useState<string | null>(
+    null,
+  );
   const [formData, setFormData] = useState({ name: "", tiktokUsername: "" });
 
   const processedCodeRef = useRef<string | null>(null);
@@ -83,25 +85,25 @@ export function TikTokAccountsContent({ user }: TikTokAccountsContentProps) {
 
   // Check if TikTok OAuth is configured
   const { data: oauthConfig } = useQuery(
-    trpc.tiktokOAuth.isConfigured.queryOptions()
+    trpc.tiktokOAuth.isConfigured.queryOptions(),
   );
 
   // Get all TikTok accounts
-  const { data: accounts, isLoading, refetch } = useQuery(
-    trpc.tiktokAccount.list.queryOptions()
-  );
+  const {
+    data: accounts,
+    isLoading,
+    refetch,
+  } = useQuery(trpc.tiktokAccount.list.queryOptions());
 
   // Get cloud phones for linking
-  const { data: cloudPhones } = useQuery(
-    trpc.cloudPhone.list.queryOptions()
-  );
+  const { data: cloudPhones } = useQuery(trpc.cloudPhone.list.queryOptions());
 
   // Get account details
   const { data: accountStats } = useQuery(
     trpc.tiktokAccount.getStats.queryOptions(
       { id: detailsAccountId ?? "" },
-      { enabled: !!detailsAccountId }
-    )
+      { enabled: !!detailsAccountId },
+    ),
   );
 
   const { data: accountClipsData, isLoading: isLoadingClips } = useQuery(
@@ -111,22 +113,22 @@ export function TikTokAccountsContent({ user }: TikTokAccountsContentProps) {
         limit: 20,
         offset: clipsPage * 20,
       },
-      { enabled: !!detailsAccountId }
-    )
+      { enabled: !!detailsAccountId },
+    ),
   );
 
   const { data: linkedUsers, refetch: refetchLinkedUsers } = useQuery(
     trpc.tiktokAccount.getLinkedUsers.queryOptions(
       { id: detailsAccountId ?? "" },
-      { enabled: !!detailsAccountId }
-    )
+      { enabled: !!detailsAccountId },
+    ),
   );
 
   const { data: allUsers } = useQuery(trpc.admin.users.queryOptions());
 
   // OAuth mutations
   const getAuthUrl = useMutation(
-    trpc.tiktokOAuth.getAuthorizationUrl.mutationOptions()
+    trpc.tiktokOAuth.getAuthorizationUrl.mutationOptions(),
   );
 
   const exchangeCode = useMutation(
@@ -135,9 +137,11 @@ export function TikTokAccountsContent({ user }: TikTokAccountsContentProps) {
         setConnectSuccess(
           data.isNew
             ? `Successfully connected new account: ${data.account?.name}`
-            : `Successfully reconnected account: ${data.account?.name}`
+            : `Successfully reconnected account: ${data.account?.name}`,
         );
-        void queryClient.invalidateQueries({ queryKey: trpc.tiktokAccount.list.queryKey() });
+        void queryClient.invalidateQueries({
+          queryKey: trpc.tiktokAccount.list.queryKey(),
+        });
         setIsConnecting(false);
         // Clear URL params
         router.replace("/admin/tiktok-accounts");
@@ -146,89 +150,107 @@ export function TikTokAccountsContent({ user }: TikTokAccountsContentProps) {
         setConnectError(error.message);
         setIsConnecting(false);
       },
-    })
+    }),
   );
 
   const syncAccount = useMutation(
     trpc.tiktokOAuth.syncAccountInfo.mutationOptions({
       onSuccess: () => {
-        void queryClient.invalidateQueries({ queryKey: trpc.tiktokAccount.list.queryKey() });
+        void queryClient.invalidateQueries({
+          queryKey: trpc.tiktokAccount.list.queryKey(),
+        });
       },
-    })
+    }),
   );
 
   const disconnectAccount = useMutation(
     trpc.tiktokOAuth.disconnect.mutationOptions({
       onSuccess: () => {
-        void queryClient.invalidateQueries({ queryKey: trpc.tiktokAccount.list.queryKey() });
+        void queryClient.invalidateQueries({
+          queryKey: trpc.tiktokAccount.list.queryKey(),
+        });
       },
-    })
+    }),
   );
 
   // Manual CRUD mutations
   const createMutation = useMutation(
     trpc.tiktokAccount.create.mutationOptions({
       onSuccess: () => {
-        void queryClient.invalidateQueries({ queryKey: trpc.tiktokAccount.list.queryKey() });
+        void queryClient.invalidateQueries({
+          queryKey: trpc.tiktokAccount.list.queryKey(),
+        });
         setIsCreateModalOpen(false);
         setFormData({ name: "", tiktokUsername: "" });
       },
-    })
+    }),
   );
 
   const updateMutation = useMutation(
     trpc.tiktokAccount.update.mutationOptions({
       onSuccess: () => {
-        void queryClient.invalidateQueries({ queryKey: trpc.tiktokAccount.list.queryKey() });
+        void queryClient.invalidateQueries({
+          queryKey: trpc.tiktokAccount.list.queryKey(),
+        });
         setIsEditModalOpen(false);
         setSelectedAccountId(null);
         setFormData({ name: "", tiktokUsername: "" });
       },
-    })
+    }),
   );
 
   const deleteMutation = useMutation(
     trpc.tiktokAccount.delete.mutationOptions({
       onSuccess: () => {
-        void queryClient.invalidateQueries({ queryKey: trpc.tiktokAccount.list.queryKey() });
+        void queryClient.invalidateQueries({
+          queryKey: trpc.tiktokAccount.list.queryKey(),
+        });
       },
-    })
+    }),
   );
 
   const assignToCloudPhoneMutation = useMutation(
     trpc.tiktokAccount.assignToCloudPhone.mutationOptions({
       onSuccess: () => {
-        void queryClient.invalidateQueries({ queryKey: trpc.tiktokAccount.list.queryKey() });
-        void queryClient.invalidateQueries({ queryKey: trpc.cloudPhone.list.queryKey() });
+        void queryClient.invalidateQueries({
+          queryKey: trpc.tiktokAccount.list.queryKey(),
+        });
+        void queryClient.invalidateQueries({
+          queryKey: trpc.cloudPhone.list.queryKey(),
+        });
         setIsAssignModalOpen(false);
         setSelectedAccountId(null);
       },
-    })
+    }),
   );
 
   const linkUserMutation = useMutation(
     trpc.tiktokAccount.linkUser.mutationOptions({
       onSuccess: () => {
         void refetchLinkedUsers();
-        void queryClient.invalidateQueries({ queryKey: trpc.tiktokAccount.list.queryKey() });
+        void queryClient.invalidateQueries({
+          queryKey: trpc.tiktokAccount.list.queryKey(),
+        });
         setSelectedUserToLink("");
       },
-    })
+    }),
   );
 
   const unlinkUserMutation = useMutation(
     trpc.tiktokAccount.unlinkUser.mutationOptions({
       onSuccess: () => {
         void refetchLinkedUsers();
-        void queryClient.invalidateQueries({ queryKey: trpc.tiktokAccount.list.queryKey() });
+        void queryClient.invalidateQueries({
+          queryKey: trpc.tiktokAccount.list.queryKey(),
+        });
       },
-    })
+    }),
   );
 
   // Handle OAuth callback
   useEffect(() => {
     const code = searchParams.get("code");
-    const state = searchParams.get("state");
+    const _state = searchParams.get("state");
     const error = searchParams.get("error");
     const errorDescription = searchParams.get("error_description");
 
@@ -237,7 +259,11 @@ export function TikTokAccountsContent({ user }: TikTokAccountsContentProps) {
       if (connectError === (errorDescription ?? error)) return;
 
       const timer = setTimeout(() => {
-        console.log("[TikTok OAuth] Error in callback:", error, errorDescription);
+        console.log(
+          "[TikTok OAuth] Error in callback:",
+          error,
+          errorDescription,
+        );
         setConnectError(errorDescription ?? error);
         router.replace("/admin/tiktok-accounts");
         localStorage.removeItem("tiktok_code_verifier");
@@ -251,14 +277,19 @@ export function TikTokAccountsContent({ user }: TikTokAccountsContentProps) {
       processedCodeRef.current = code;
 
       const timer = setTimeout(() => {
-        console.log("[TikTok OAuth] Processing callback code:", code.substring(0, 10) + "...");
+        console.log(
+          "[TikTok OAuth] Processing callback code:",
+          code.substring(0, 10) + "...",
+        );
         setIsConnecting(true);
         setConnectError(null);
 
         // Retrieve code verifier from localStorage
         const codeVerifier = localStorage.getItem("tiktok_code_verifier");
         if (!codeVerifier) {
-          console.error("[TikTok OAuth] Code verifier not found in localStorage");
+          console.error(
+            "[TikTok OAuth] Code verifier not found in localStorage",
+          );
           setConnectError("OAuth state error: code_verifier not found");
           setIsConnecting(false);
           router.replace("/admin/tiktok-accounts");
@@ -268,13 +299,20 @@ export function TikTokAccountsContent({ user }: TikTokAccountsContentProps) {
         // Exchange code for token
         const redirectUri = `${window.location.origin}/admin/tiktok-accounts`;
         exchangeCode.mutate({ code, redirectUri, codeVerifier });
-        
+
         // Clear stored code verifier immediately to prevent reuse
         localStorage.removeItem("tiktok_code_verifier");
       }, 0);
       return () => clearTimeout(timer);
     }
-  }, [searchParams, exchangeCode, router, isConnecting, connectSuccess, connectError]);
+  }, [
+    searchParams,
+    exchangeCode,
+    router,
+    isConnecting,
+    connectSuccess,
+    connectError,
+  ]);
 
   const handleConnectAccount = async () => {
     setConnectError(null);
@@ -282,13 +320,16 @@ export function TikTokAccountsContent({ user }: TikTokAccountsContentProps) {
 
     try {
       const redirectUri = `${window.location.origin}/admin/tiktok-accounts`;
-      console.log("[Frontend] Starting OAuth flow with redirectUri:", redirectUri);
-      
+      console.log(
+        "[Frontend] Starting OAuth flow with redirectUri:",
+        redirectUri,
+      );
+
       const result = await getAuthUrl.mutateAsync({ redirectUri });
-      
+
       console.log("[Frontend] Received OAuth response:");
       console.log("  - authUrl:", result.authUrl);
-      console.log("  - codeVerifier length:", result.codeVerifier?.length);
+      console.log("  - codeVerifier length:", result.codeVerifier.length);
 
       // Store code verifier in localStorage for later use
       localStorage.setItem("tiktok_code_verifier", result.codeVerifier);
@@ -299,11 +340,17 @@ export function TikTokAccountsContent({ user }: TikTokAccountsContentProps) {
       window.location.href = result.authUrl;
     } catch (error) {
       console.error("[Frontend] OAuth flow error:", error);
-      setConnectError(error instanceof Error ? error.message : "Failed to start OAuth flow");
+      setConnectError(
+        error instanceof Error ? error.message : "Failed to start OAuth flow",
+      );
     }
   };
 
-  const handleEditClick = (account: { id: string; name: string; tiktokUsername: string }) => {
+  const handleEditClick = (account: {
+    id: string;
+    name: string;
+    tiktokUsername: string;
+  }) => {
     setSelectedAccountId(account.id);
     setFormData({ name: account.name, tiktokUsername: account.tiktokUsername });
     setIsEditModalOpen(true);
@@ -338,7 +385,7 @@ export function TikTokAccountsContent({ user }: TikTokAccountsContentProps) {
 
     if (confirmAction.type === "disconnect") {
       disconnectAccount.mutate({ accountId: confirmAction.accountId });
-    } else if (confirmAction.type === "delete") {
+    } else {
       deleteMutation.mutate({ id: confirmAction.accountId });
     }
     setConfirmAction(null);
@@ -346,7 +393,9 @@ export function TikTokAccountsContent({ user }: TikTokAccountsContentProps) {
   };
 
   // Get pending count for badge
-  const { data: pendingClips = [] } = useQuery(trpc.admin.pendingClips.queryOptions());
+  const { data: pendingClips = [] } = useQuery(
+    trpc.admin.pendingClips.queryOptions(),
+  );
 
   // Add badge to Dashboard item
   const navItems: NavItem[] = adminNavItems.map((item) => {
@@ -357,7 +406,7 @@ export function TikTokAccountsContent({ user }: TikTokAccountsContentProps) {
   });
 
   return (
-    <div className="flex min-h-screen bg-background">
+    <div className="bg-background flex min-h-screen">
       <Sidebar
         user={{ ...user, role: "admin" }}
         title="Admin"
@@ -365,12 +414,12 @@ export function TikTokAccountsContent({ user }: TikTokAccountsContentProps) {
         items={navItems}
         bottomContent={
           <>
-            <p className="mb-2 px-3 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+            <p className="text-muted-foreground mb-2 px-3 text-xs font-medium tracking-wider uppercase">
               Switch View
             </p>
             <Link
               href="/dashboard"
-              className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+              className="text-muted-foreground hover:bg-accent hover:text-foreground flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors"
             >
               <Video className="size-5" />
               Creator Dashboard
@@ -382,11 +431,13 @@ export function TikTokAccountsContent({ user }: TikTokAccountsContentProps) {
       {/* Main Content */}
       <main className="flex-1 overflow-auto">
         {/* Header */}
-        <header className="sticky top-0 z-10 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <header className="border-border bg-background/95 supports-[backdrop-filter]:bg-background/60 sticky top-0 z-10 border-b backdrop-blur">
           <div className="flex h-16 items-center justify-between px-8">
             <div>
-              <h1 className="text-xl font-semibold text-foreground">TikTok Accounts</h1>
-              <p className="text-sm text-muted-foreground">
+              <h1 className="text-foreground text-xl font-semibold">
+                TikTok Accounts
+              </h1>
+              <p className="text-muted-foreground text-sm">
                 {oauthConfig?.configured
                   ? "Connect and manage TikTok accounts via OAuth 2.0"
                   : "Manage TikTok accounts and cloud phone assignments"}
@@ -399,7 +450,9 @@ export function TikTokAccountsContent({ user }: TikTokAccountsContentProps) {
                 onClick={() => void refetch()}
                 disabled={isLoading}
               >
-                <RefreshCw className={`size-4 ${isLoading ? "animate-spin" : ""}`} />
+                <RefreshCw
+                  className={`size-4 ${isLoading ? "animate-spin" : ""}`}
+                />
                 Refresh
               </Button>
               {oauthConfig?.configured ? (
@@ -427,18 +480,25 @@ export function TikTokAccountsContent({ user }: TikTokAccountsContentProps) {
           </div>
         </header>
 
-        <div className="p-8 space-y-6">
+        <div className="space-y-6 p-8">
           {/* OAuth Not Configured Warning */}
           {!oauthConfig?.configured && (
             <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-amber-800">
               <div className="flex items-start gap-3">
-                <AlertCircle className="size-5 mt-0.5 shrink-0" />
+                <AlertCircle className="mt-0.5 size-5 shrink-0" />
                 <div>
                   <p className="font-medium">TikTok OAuth not configured</p>
-                  <p className="text-sm mt-1">
-                    Set <code className="rounded bg-amber-100 px-1">TIKTOK_CLIENT_KEY</code> and{" "}
-                    <code className="rounded bg-amber-100 px-1">TIKTOK_CLIENT_SECRET</code> environment
-                    variables to enable OAuth authentication. You can still add accounts manually.
+                  <p className="mt-1 text-sm">
+                    Set{" "}
+                    <code className="rounded bg-amber-100 px-1">
+                      TIKTOK_CLIENT_KEY
+                    </code>{" "}
+                    and{" "}
+                    <code className="rounded bg-amber-100 px-1">
+                      TIKTOK_CLIENT_SECRET
+                    </code>{" "}
+                    environment variables to enable OAuth authentication. You
+                    can still add accounts manually.
                   </p>
                 </div>
               </div>
@@ -449,10 +509,10 @@ export function TikTokAccountsContent({ user }: TikTokAccountsContentProps) {
           {connectError && (
             <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-red-800">
               <div className="flex items-start gap-3">
-                <X className="size-5 mt-0.5 shrink-0" />
+                <X className="mt-0.5 size-5 shrink-0" />
                 <div>
                   <p className="font-medium">Connection failed</p>
-                  <p className="text-sm mt-1">{connectError}</p>
+                  <p className="mt-1 text-sm">{connectError}</p>
                 </div>
               </div>
             </div>
@@ -462,7 +522,7 @@ export function TikTokAccountsContent({ user }: TikTokAccountsContentProps) {
           {connectSuccess && (
             <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-emerald-800">
               <div className="flex items-start gap-3">
-                <Check className="size-5 mt-0.5 shrink-0" />
+                <Check className="mt-0.5 size-5 shrink-0" />
                 <p className="font-medium">{connectSuccess}</p>
               </div>
             </div>
@@ -481,40 +541,40 @@ export function TikTokAccountsContent({ user }: TikTokAccountsContentProps) {
           {/* Accounts Table */}
           {isLoading ? (
             <div className="flex items-center justify-center py-12">
-              <RefreshCw className="size-8 animate-spin text-muted-foreground" />
+              <RefreshCw className="text-muted-foreground size-8 animate-spin" />
             </div>
           ) : (
-            <div className="rounded-xl border border-border bg-card shadow-sm">
+            <div className="border-border bg-card rounded-xl border shadow-sm">
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead>
-                    <tr className="border-b border-border bg-muted/30">
-                      <th className="px-6 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                    <tr className="border-border bg-muted/30 border-b">
+                      <th className="text-muted-foreground px-6 py-3.5 text-left text-xs font-medium tracking-wider uppercase">
                         Account
                       </th>
-                      <th className="px-6 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                      <th className="text-muted-foreground px-6 py-3.5 text-left text-xs font-medium tracking-wider uppercase">
                         Status
                       </th>
-                      <th className="px-6 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                      <th className="text-muted-foreground px-6 py-3.5 text-left text-xs font-medium tracking-wider uppercase">
                         Followers
                       </th>
-                      <th className="px-6 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                      <th className="text-muted-foreground px-6 py-3.5 text-left text-xs font-medium tracking-wider uppercase">
                         Cloud Phone
                       </th>
-                      <th className="px-6 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                      <th className="text-muted-foreground px-6 py-3.5 text-left text-xs font-medium tracking-wider uppercase">
                         Linked Users
                       </th>
-                      <th className="px-6 py-3.5 text-right text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                      <th className="text-muted-foreground px-6 py-3.5 text-right text-xs font-medium tracking-wider uppercase">
                         Actions
                       </th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-border">
+                  <tbody className="divide-border divide-y">
                     {accounts?.length === 0 ? (
                       <tr>
                         <td colSpan={6} className="px-6 py-12 text-center">
-                          <Video className="mx-auto size-12 text-muted-foreground/50" />
-                          <p className="mt-4 text-sm text-muted-foreground">
+                          <Video className="text-muted-foreground/50 mx-auto size-12" />
+                          <p className="text-muted-foreground mt-4 text-sm">
                             No TikTok accounts yet
                           </p>
                           {oauthConfig?.configured ? (
@@ -541,12 +601,16 @@ export function TikTokAccountsContent({ user }: TikTokAccountsContentProps) {
                       </tr>
                     ) : (
                       accounts?.map((account) => (
-                        <tr 
-                          key={account.id} 
-                          className="group cursor-pointer transition-colors hover:bg-accent/50"
+                        <tr
+                          key={account.id}
+                          className="group hover:bg-accent/50 cursor-pointer transition-colors"
                           onClick={(e) => {
                             // Prevent opening details if clicking on actions or cloud phone buttons
-                            if ((e.target as HTMLElement).closest("button") || (e.target as HTMLElement).closest("a")) return;
+                            if (
+                              (e.target as HTMLElement).closest("button") ||
+                              (e.target as HTMLElement).closest("a")
+                            )
+                              return;
                             setDetailsAccountId(account.id);
                             setClipsPage(0);
                           }}
@@ -557,8 +621,10 @@ export function TikTokAccountsContent({ user }: TikTokAccountsContentProps) {
                                 {account.name.charAt(0).toUpperCase()}
                               </div>
                               <div>
-                                <p className="font-medium text-foreground">{account.name}</p>
-                                <p className="text-xs text-muted-foreground">
+                                <p className="text-foreground font-medium">
+                                  {account.name}
+                                </p>
+                                <p className="text-muted-foreground text-xs">
                                   @{account.tiktokUsername}
                                 </p>
                               </div>
@@ -577,16 +643,16 @@ export function TikTokAccountsContent({ user }: TikTokAccountsContentProps) {
                               </span>
                             )}
                           </td>
-                          <td className="px-6 py-4 text-foreground">
+                          <td className="text-foreground px-6 py-4">
                             {account.followerCount?.toLocaleString() ?? "-"}
                           </td>
                           <td className="px-6 py-4">
                             {account.cloudPhone ? (
                               <div className="flex items-center gap-2">
-                                <div className="flex size-6 items-center justify-center rounded-full bg-primary/10">
-                                  <Check className="size-3 text-primary" />
+                                <div className="bg-primary/10 flex size-6 items-center justify-center rounded-full">
+                                  <Check className="text-primary size-3" />
                                 </div>
-                                <span className="text-sm font-medium text-foreground">
+                                <span className="text-foreground text-sm font-medium">
                                   {account.cloudPhone.serialName}
                                 </span>
                                 <button
@@ -594,7 +660,7 @@ export function TikTokAccountsContent({ user }: TikTokAccountsContentProps) {
                                     setSelectedAccountId(account.id);
                                     handleAssign(null);
                                   }}
-                                  className="ml-1 rounded p-1 text-muted-foreground hover:bg-red-50 hover:text-red-600"
+                                  className="text-muted-foreground ml-1 rounded p-1 hover:bg-red-50 hover:text-red-600"
                                   title="Unlink"
                                 >
                                   <X className="size-3" />
@@ -603,7 +669,7 @@ export function TikTokAccountsContent({ user }: TikTokAccountsContentProps) {
                             ) : (
                               <button
                                 onClick={() => handleAssignClick(account.id)}
-                                className="flex items-center gap-1 text-sm text-muted-foreground hover:text-primary"
+                                className="text-muted-foreground hover:text-primary flex items-center gap-1 text-sm"
                               >
                                 <Link2 className="size-3" />
                                 Assign
@@ -612,9 +678,12 @@ export function TikTokAccountsContent({ user }: TikTokAccountsContentProps) {
                           </td>
                           <td className="px-6 py-4">
                             <div className="flex items-center gap-2">
-                              <Users className="size-4 text-muted-foreground" />
-                              <span className="text-sm text-foreground">
-                                {account.userTiktokAccounts.length} {account.userTiktokAccounts.length === 1 ? "user" : "users"}
+                              <Users className="text-muted-foreground size-4" />
+                              <span className="text-foreground text-sm">
+                                {account.userTiktokAccounts.length}{" "}
+                                {account.userTiktokAccounts.length === 1
+                                  ? "user"
+                                  : "users"}
                               </span>
                             </div>
                           </td>
@@ -628,7 +697,9 @@ export function TikTokAccountsContent({ user }: TikTokAccountsContentProps) {
                                     className="gap-1"
                                     onClick={(e) => {
                                       e.stopPropagation();
-                                      syncAccount.mutate({ accountId: account.id });
+                                      syncAccount.mutate({
+                                        accountId: account.id,
+                                      });
                                     }}
                                     disabled={syncAccount.isPending}
                                   >
@@ -660,7 +731,7 @@ export function TikTokAccountsContent({ user }: TikTokAccountsContentProps) {
                                       setConfirmAction({
                                         type: "disconnect",
                                         accountId: account.id,
-                                        accountName: account.name
+                                        accountName: account.name,
                                       });
                                     }}
                                     disabled={disconnectAccount.isPending}
@@ -675,7 +746,7 @@ export function TikTokAccountsContent({ user }: TikTokAccountsContentProps) {
                                     className="gap-1"
                                     onClick={(e) => {
                                       e.stopPropagation();
-                                      handleConnectAccount();
+                                      void handleConnectAccount();
                                     }}
                                   >
                                     <ExternalLink className="size-3" />
@@ -691,7 +762,7 @@ export function TikTokAccountsContent({ user }: TikTokAccountsContentProps) {
                                     setConfirmAction({
                                       type: "delete",
                                       accountId: account.id,
-                                      accountName: account.name
+                                      accountName: account.name,
                                     });
                                     setConfirmInput("");
                                   }}
@@ -700,7 +771,7 @@ export function TikTokAccountsContent({ user }: TikTokAccountsContentProps) {
                                   <Trash2 className="size-3" />
                                 </Button>
                               </div>
-                              <ChevronRight className="size-5 text-muted-foreground/30 transition-colors group-hover:text-muted-foreground" />
+                              <ChevronRight className="text-muted-foreground/30 group-hover:text-muted-foreground size-5 transition-colors" />
                             </div>
                           </td>
                         </tr>
@@ -714,13 +785,20 @@ export function TikTokAccountsContent({ user }: TikTokAccountsContentProps) {
 
           {/* Help Text */}
           {oauthConfig?.configured && (
-            <div className="rounded-lg border border-border bg-muted/30 p-4 text-sm text-muted-foreground">
-              <p className="font-medium text-foreground">How OAuth 2.0 Connection Works:</p>
+            <div className="border-border bg-muted/30 text-muted-foreground rounded-lg border p-4 text-sm">
+              <p className="text-foreground font-medium">
+                How OAuth 2.0 Connection Works:
+              </p>
               <ol className="mt-2 list-inside list-decimal space-y-1">
                 <li>Click "Connect Account" to start the OAuth flow</li>
-                <li>You'll be redirected to TikTok to authorize the connection</li>
+                <li>
+                  You'll be redirected to TikTok to authorize the connection
+                </li>
                 <li>After authorization, you'll be redirected back here</li>
-                <li>The account will be saved and can be assigned to content creators</li>
+                <li>
+                  The account will be saved and can be assigned to content
+                  creators
+                </li>
               </ol>
             </div>
           )}
@@ -730,10 +808,12 @@ export function TikTokAccountsContent({ user }: TikTokAccountsContentProps) {
       {/* Create/Edit Modal */}
       {(isCreateModalOpen || isEditModalOpen) && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="w-full max-w-md rounded-xl bg-card p-6 shadow-lg">
+          <div className="bg-card w-full max-w-md rounded-xl p-6 shadow-lg">
             <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-foreground">
-                {isCreateModalOpen ? "Create TikTok Account" : "Edit TikTok Account"}
+              <h2 className="text-foreground text-lg font-semibold">
+                {isCreateModalOpen
+                  ? "Create TikTok Account"
+                  : "Edit TikTok Account"}
               </h2>
               <button
                 onClick={() => {
@@ -742,7 +822,7 @@ export function TikTokAccountsContent({ user }: TikTokAccountsContentProps) {
                   setSelectedAccountId(null);
                   setFormData({ name: "", tiktokUsername: "" });
                 }}
-                className="rounded-lg p-2 text-muted-foreground hover:bg-accent"
+                className="text-muted-foreground hover:bg-accent rounded-lg p-2"
               >
                 <X className="size-4" />
               </button>
@@ -753,7 +833,9 @@ export function TikTokAccountsContent({ user }: TikTokAccountsContentProps) {
                 <Input
                   id="name"
                   value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, name: e.target.value })
+                  }
                   placeholder="My TikTok Account"
                   className="mt-1"
                 />
@@ -763,7 +845,9 @@ export function TikTokAccountsContent({ user }: TikTokAccountsContentProps) {
                 <Input
                   id="username"
                   value={formData.tiktokUsername}
-                  onChange={(e) => setFormData({ ...formData, tiktokUsername: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, tiktokUsername: e.target.value })
+                  }
                   placeholder="username (without @)"
                   className="mt-1"
                 />
@@ -795,9 +879,9 @@ export function TikTokAccountsContent({ user }: TikTokAccountsContentProps) {
       {/* Assign Cloud Phone Modal */}
       {isAssignModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="w-full max-w-md rounded-xl bg-card p-6 shadow-lg">
+          <div className="bg-card w-full max-w-md rounded-xl p-6 shadow-lg">
             <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-foreground">
+              <h2 className="text-foreground text-lg font-semibold">
                 Assign Cloud Phone
               </h2>
               <button
@@ -805,7 +889,7 @@ export function TikTokAccountsContent({ user }: TikTokAccountsContentProps) {
                   setIsAssignModalOpen(false);
                   setSelectedAccountId(null);
                 }}
-                className="rounded-lg p-2 text-muted-foreground hover:bg-accent"
+                className="text-muted-foreground hover:bg-accent rounded-lg p-2"
               >
                 <X className="size-4" />
               </button>
@@ -815,21 +899,23 @@ export function TikTokAccountsContent({ user }: TikTokAccountsContentProps) {
                 <button
                   key={phone.id}
                   onClick={() => handleAssign(phone.id)}
-                  className="flex w-full items-center gap-3 rounded-lg border border-border p-3 text-left transition-colors hover:bg-muted/50"
+                  className="border-border hover:bg-muted/50 flex w-full items-center gap-3 rounded-lg border p-3 text-left transition-colors"
                 >
-                  <div className="flex size-10 items-center justify-center rounded-lg bg-muted">
-                    <Smartphone className="size-5 text-muted-foreground" />
+                  <div className="bg-muted flex size-10 items-center justify-center rounded-lg">
+                    <Smartphone className="text-muted-foreground size-5" />
                   </div>
                   <div>
-                    <p className="font-medium text-foreground">{phone.serialName}</p>
-                    <p className="text-sm text-muted-foreground">
+                    <p className="text-foreground font-medium">
+                      {phone.serialName}
+                    </p>
+                    <p className="text-muted-foreground text-sm">
                       #{phone.serialNo}
                     </p>
                   </div>
                 </button>
               ))}
               {(!cloudPhones || cloudPhones.length === 0) && (
-                <p className="py-4 text-center text-sm text-muted-foreground">
+                <p className="text-muted-foreground py-4 text-center text-sm">
                   No cloud phones available. Sync from GeeLark first.
                 </p>
               )}
@@ -841,18 +927,18 @@ export function TikTokAccountsContent({ user }: TikTokAccountsContentProps) {
       {/* Account Details Side Panel */}
       {detailsAccountId && (
         <>
-          <div 
+          <div
             className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm transition-opacity"
             onClick={() => setDetailsAccountId(null)}
           />
-          <div className="fixed inset-y-0 right-0 z-50 w-full max-w-2xl border-l border-border bg-background shadow-2xl transition-transform duration-300 ease-in-out">
+          <div className="border-border bg-background fixed inset-y-0 right-0 z-50 w-full max-w-2xl border-l shadow-2xl transition-transform duration-300 ease-in-out">
             <div className="flex h-full flex-col">
               {/* Header */}
-              <div className="flex items-center justify-between border-b border-border px-6 py-4">
+              <div className="border-border flex items-center justify-between border-b px-6 py-4">
                 <div>
                   <h2 className="text-lg font-semibold">Account Details</h2>
-                  <p className="text-sm text-muted-foreground">
-                    {accounts?.find(a => a.id === detailsAccountId)?.name}
+                  <p className="text-muted-foreground text-sm">
+                    {accounts?.find((a) => a.id === detailsAccountId)?.name}
                   </p>
                 </div>
                 <Button
@@ -866,38 +952,46 @@ export function TikTokAccountsContent({ user }: TikTokAccountsContentProps) {
 
               <div className="flex-1 overflow-y-auto p-6">
                 {/* Stats Cards */}
-                <div className="grid grid-cols-2 gap-4 sm:grid-cols-4 mb-8">
-                  <div className="rounded-lg border border-border bg-card p-4">
-                    <div className="flex items-center gap-2 text-muted-foreground">
+                <div className="mb-8 grid grid-cols-2 gap-4 sm:grid-cols-4">
+                  <div className="border-border bg-card rounded-lg border p-4">
+                    <div className="text-muted-foreground flex items-center gap-2">
                       <Video className="size-4" />
-                      <span className="text-xs font-medium uppercase">Videos</span>
+                      <span className="text-xs font-medium uppercase">
+                        Videos
+                      </span>
                     </div>
                     <p className="mt-2 text-2xl font-bold">
                       {accountStats?.totalVideos.toLocaleString() ?? "-"}
                     </p>
                   </div>
-                  <div className="rounded-lg border border-border bg-card p-4">
-                    <div className="flex items-center gap-2 text-muted-foreground">
+                  <div className="border-border bg-card rounded-lg border p-4">
+                    <div className="text-muted-foreground flex items-center gap-2">
                       <Heart className="size-4" />
-                      <span className="text-xs font-medium uppercase">Likes</span>
+                      <span className="text-xs font-medium uppercase">
+                        Likes
+                      </span>
                     </div>
                     <p className="mt-2 text-2xl font-bold">
                       {accountStats?.totalLikes.toLocaleString() ?? "-"}
                     </p>
                   </div>
-                  <div className="rounded-lg border border-border bg-card p-4">
-                    <div className="flex items-center gap-2 text-muted-foreground">
+                  <div className="border-border bg-card rounded-lg border p-4">
+                    <div className="text-muted-foreground flex items-center gap-2">
                       <Share2 className="size-4" />
-                      <span className="text-xs font-medium uppercase">Shares</span>
+                      <span className="text-xs font-medium uppercase">
+                        Shares
+                      </span>
                     </div>
                     <p className="mt-2 text-2xl font-bold">
                       {accountStats?.totalShares.toLocaleString() ?? "-"}
                     </p>
                   </div>
-                  <div className="rounded-lg border border-border bg-card p-4">
-                    <div className="flex items-center gap-2 text-muted-foreground">
+                  <div className="border-border bg-card rounded-lg border p-4">
+                    <div className="text-muted-foreground flex items-center gap-2">
                       <MessageCircle className="size-4" />
-                      <span className="text-xs font-medium uppercase">Comments</span>
+                      <span className="text-xs font-medium uppercase">
+                        Comments
+                      </span>
                     </div>
                     <p className="mt-2 text-2xl font-bold">
                       {accountStats?.totalComments.toLocaleString() ?? "-"}
@@ -908,25 +1002,34 @@ export function TikTokAccountsContent({ user }: TikTokAccountsContentProps) {
                 {/* Linked Users Section */}
                 <div className="mb-8 space-y-4">
                   <div className="flex items-center justify-between">
-                    <h3 className="font-semibold flex items-center gap-2">
+                    <h3 className="flex items-center gap-2 font-semibold">
                       <Users className="size-4" />
                       Linked Users
                     </h3>
                   </div>
-                  
-                  <div className="rounded-lg border border-border bg-card p-4">
-                    <div className="flex items-end gap-3 mb-4">
+
+                  <div className="border-border bg-card rounded-lg border p-4">
+                    <div className="mb-4 flex items-end gap-3">
                       <div className="flex-1">
-                        <Label htmlFor="link-user" className="text-xs text-muted-foreground">Add User</Label>
+                        <Label
+                          htmlFor="link-user"
+                          className="text-muted-foreground text-xs"
+                        >
+                          Add User
+                        </Label>
                         <select
                           id="link-user"
-                          className="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                          className="border-input placeholder:text-muted-foreground focus-visible:ring-ring mt-1 flex h-9 w-full rounded-md border bg-transparent px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium focus-visible:ring-1 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
                           value={selectedUserToLink}
-                          onChange={(e) => setSelectedUserToLink(e.target.value)}
+                          onChange={(e) =>
+                            setSelectedUserToLink(e.target.value)
+                          }
                         >
                           <option value="">Select a user...</option>
                           {allUsers
-                            ?.filter(u => !linkedUsers?.some(lu => lu.id === u.id))
+                            ?.filter(
+                              (u) => !linkedUsers?.some((lu) => lu.id === u.id),
+                            )
                             .map((user) => (
                               <option key={user.id} value={user.id}>
                                 {user.name} ({user.email})
@@ -934,14 +1037,16 @@ export function TikTokAccountsContent({ user }: TikTokAccountsContentProps) {
                             ))}
                         </select>
                       </div>
-                      <Button 
+                      <Button
                         size="sm"
-                        disabled={!selectedUserToLink || linkUserMutation.isPending}
+                        disabled={
+                          !selectedUserToLink || linkUserMutation.isPending
+                        }
                         onClick={() => {
                           if (detailsAccountId && selectedUserToLink) {
                             linkUserMutation.mutate({
                               tiktokAccountId: detailsAccountId,
-                              userId: selectedUserToLink
+                              userId: selectedUserToLink,
                             });
                           }
                         }}
@@ -957,30 +1062,37 @@ export function TikTokAccountsContent({ user }: TikTokAccountsContentProps) {
 
                     <div className="space-y-2">
                       {linkedUsers?.length === 0 ? (
-                        <p className="text-sm text-muted-foreground text-center py-2">
+                        <p className="text-muted-foreground py-2 text-center text-sm">
                           No users linked to this account
                         </p>
                       ) : (
                         linkedUsers?.map((user) => (
-                          <div key={user.id} className="flex items-center justify-between rounded-md border border-border bg-muted/30 p-2">
+                          <div
+                            key={user.id}
+                            className="border-border bg-muted/30 flex items-center justify-between rounded-md border p-2"
+                          >
                             <div className="flex items-center gap-3">
-                              <div className="flex size-8 items-center justify-center rounded-full bg-primary/10 text-xs font-medium text-primary">
+                              <div className="bg-primary/10 text-primary flex size-8 items-center justify-center rounded-full text-xs font-medium">
                                 {user.name.charAt(0).toUpperCase()}
                               </div>
                               <div>
-                                <p className="text-sm font-medium">{user.name}</p>
-                                <p className="text-xs text-muted-foreground">{user.email}</p>
+                                <p className="text-sm font-medium">
+                                  {user.name}
+                                </p>
+                                <p className="text-muted-foreground text-xs">
+                                  {user.email}
+                                </p>
                               </div>
                             </div>
                             <Button
                               variant="ghost"
                               size="sm"
-                              className="h-8 w-8 p-0 text-muted-foreground hover:text-red-600"
+                              className="text-muted-foreground h-8 w-8 p-0 hover:text-red-600"
                               onClick={() => {
                                 if (detailsAccountId) {
                                   unlinkUserMutation.mutate({
                                     tiktokAccountId: detailsAccountId,
-                                    userId: user.id
+                                    userId: user.id,
                                   });
                                 }
                               }}
@@ -1004,18 +1116,22 @@ export function TikTokAccountsContent({ user }: TikTokAccountsContentProps) {
                         variant="outline"
                         size="sm"
                         disabled={clipsPage === 0 || isLoadingClips}
-                        onClick={() => setClipsPage(p => Math.max(0, p - 1))}
+                        onClick={() => setClipsPage((p) => Math.max(0, p - 1))}
                       >
                         Previous
                       </Button>
-                      <span className="text-sm text-muted-foreground">
+                      <span className="text-muted-foreground text-sm">
                         Page {clipsPage + 1}
                       </span>
                       <Button
                         variant="outline"
                         size="sm"
-                        disabled={!accountClipsData?.clips.length || accountClipsData.clips.length < 20 || isLoadingClips}
-                        onClick={() => setClipsPage(p => p + 1)}
+                        disabled={
+                          !accountClipsData?.clips.length ||
+                          accountClipsData.clips.length < 20 ||
+                          isLoadingClips
+                        }
+                        onClick={() => setClipsPage((p) => p + 1)}
                       >
                         Next
                       </Button>
@@ -1024,63 +1140,78 @@ export function TikTokAccountsContent({ user }: TikTokAccountsContentProps) {
 
                   {isLoadingClips ? (
                     <div className="flex justify-center py-8">
-                      <RefreshCw className="size-6 animate-spin text-muted-foreground" />
+                      <RefreshCw className="text-muted-foreground size-6 animate-spin" />
                     </div>
                   ) : !accountClipsData?.clips.length ? (
-                    <div className="rounded-lg border border-border bg-muted/30 p-8 text-center text-muted-foreground">
+                    <div className="border-border bg-muted/30 text-muted-foreground rounded-lg border p-8 text-center">
                       No clips found for this account
                     </div>
                   ) : (
-                    <div className="rounded-lg border border-border">
+                    <div className="border-border rounded-lg border">
                       <table className="w-full">
-                        <thead className="bg-muted/30 text-xs uppercase text-muted-foreground">
+                        <thead className="bg-muted/30 text-muted-foreground text-xs uppercase">
                           <tr>
                             <th className="px-4 py-3 text-left">Video</th>
                             <th className="px-4 py-3 text-left">Status</th>
                             <th className="px-4 py-3 text-right">Published</th>
-                            <th className="px-4 py-3 w-10"></th>
+                            <th className="w-10 px-4 py-3"></th>
                           </tr>
                         </thead>
-                        <tbody className="divide-y divide-border">
+                        <tbody className="divide-border divide-y">
                           {accountClipsData.clips.map((clip) => (
                             <Fragment key={clip.id}>
-                              <tr 
-                                className="cursor-pointer hover:bg-muted/30"
-                                onClick={() => setExpandedClipId(expandedClipId === clip.id ? null : clip.id)}
+                              <tr
+                                className="hover:bg-muted/30 cursor-pointer"
+                                onClick={() =>
+                                  setExpandedClipId(
+                                    expandedClipId === clip.id ? null : clip.id,
+                                  )
+                                }
                               >
                                 <td className="px-4 py-3">
                                   <div className="flex items-center gap-3">
-                                    <div className="flex size-10 shrink-0 items-center justify-center rounded bg-muted text-muted-foreground">
+                                    <div className="bg-muted text-muted-foreground flex size-10 shrink-0 items-center justify-center rounded">
                                       <Play className="size-4" />
                                     </div>
                                     <div className="min-w-0">
-                                      <p className="truncate font-medium text-sm">{clip.title}</p>
-                                      <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                                      <p className="truncate text-sm font-medium">
+                                        {clip.title}
+                                      </p>
+                                      <div className="text-muted-foreground flex items-center gap-3 text-xs">
                                         <span className="flex items-center gap-1">
                                           <Play className="size-3" />
-                                          {clip.latestStats?.views.toLocaleString() ?? 0}
+                                          {clip.latestStats?.views.toLocaleString() ??
+                                            0}
                                         </span>
                                       </div>
                                     </div>
                                   </div>
                                 </td>
                                 <td className="px-4 py-3">
-                                  <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
-                                    clip.status === 'published' ? 'bg-emerald-50 text-emerald-700' :
-                                    clip.status === 'failed' ? 'bg-red-50 text-red-700' :
-                                    'bg-blue-50 text-blue-700'
-                                  }`}>
+                                  <span
+                                    className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
+                                      clip.status === "published"
+                                        ? "bg-emerald-50 text-emerald-700"
+                                        : clip.status === "failed"
+                                          ? "bg-red-50 text-red-700"
+                                          : "bg-blue-50 text-blue-700"
+                                    }`}
+                                  >
                                     {clip.status}
                                   </span>
                                 </td>
-                                <td className="px-4 py-3 text-right text-xs text-muted-foreground">
-                                  {clip.publishedAt ? new Date(clip.publishedAt).toLocaleDateString() : '-'}
+                                <td className="text-muted-foreground px-4 py-3 text-right text-xs">
+                                  {clip.publishedAt
+                                    ? new Date(
+                                        clip.publishedAt,
+                                      ).toLocaleDateString()
+                                    : "-"}
                                 </td>
                                 <td className="px-4 py-3 text-center">
                                   {expandedClipId === clip.id ? (
-                                    <ChevronUp className="size-4 text-muted-foreground" />
+                                    <ChevronUp className="text-muted-foreground size-4" />
                                   ) : (
-                                    <ChevronDown className="size-4 text-muted-foreground" />
+                                    <ChevronDown className="text-muted-foreground size-4" />
                                   )}
                                 </td>
                               </tr>
@@ -1089,20 +1220,40 @@ export function TikTokAccountsContent({ user }: TikTokAccountsContentProps) {
                                   <td colSpan={4} className="px-4 py-4">
                                     <div className="grid grid-cols-4 gap-4">
                                       <div className="text-center">
-                                        <div className="text-xs text-muted-foreground mb-1">Views</div>
-                                        <div className="font-semibold">{clip.latestStats?.views.toLocaleString() ?? 0}</div>
+                                        <div className="text-muted-foreground mb-1 text-xs">
+                                          Views
+                                        </div>
+                                        <div className="font-semibold">
+                                          {clip.latestStats?.views.toLocaleString() ??
+                                            0}
+                                        </div>
                                       </div>
                                       <div className="text-center">
-                                        <div className="text-xs text-muted-foreground mb-1">Likes</div>
-                                        <div className="font-semibold">{clip.latestStats?.likes.toLocaleString() ?? 0}</div>
+                                        <div className="text-muted-foreground mb-1 text-xs">
+                                          Likes
+                                        </div>
+                                        <div className="font-semibold">
+                                          {clip.latestStats?.likes.toLocaleString() ??
+                                            0}
+                                        </div>
                                       </div>
                                       <div className="text-center">
-                                        <div className="text-xs text-muted-foreground mb-1">Shares</div>
-                                        <div className="font-semibold">{clip.latestStats?.shares.toLocaleString() ?? 0}</div>
+                                        <div className="text-muted-foreground mb-1 text-xs">
+                                          Shares
+                                        </div>
+                                        <div className="font-semibold">
+                                          {clip.latestStats?.shares.toLocaleString() ??
+                                            0}
+                                        </div>
                                       </div>
                                       <div className="text-center">
-                                        <div className="text-xs text-muted-foreground mb-1">Comments</div>
-                                        <div className="font-semibold">{clip.latestStats?.comments.toLocaleString() ?? 0}</div>
+                                        <div className="text-muted-foreground mb-1 text-xs">
+                                          Comments
+                                        </div>
+                                        <div className="font-semibold">
+                                          {clip.latestStats?.comments.toLocaleString() ??
+                                            0}
+                                        </div>
                                       </div>
                                     </div>
                                   </td>
@@ -1124,27 +1275,42 @@ export function TikTokAccountsContent({ user }: TikTokAccountsContentProps) {
       {/* Confirmation Modal */}
       {confirmAction && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-xl bg-card p-6 shadow-xl border border-border">
+          <div className="bg-card border-border w-full max-w-md rounded-xl border p-6 shadow-xl">
             <div className="mb-4 flex items-center gap-3 text-amber-600">
-              <div className={`flex size-10 items-center justify-center rounded-full ${confirmAction.type === 'delete' ? 'bg-red-50 text-red-600' : 'bg-amber-50 text-amber-600'}`}>
-                {confirmAction.type === 'delete' ? <Trash2 className="size-5" /> : <AlertCircle className="size-5" />}
+              <div
+                className={`flex size-10 items-center justify-center rounded-full ${confirmAction.type === "delete" ? "bg-red-50 text-red-600" : "bg-amber-50 text-amber-600"}`}
+              >
+                {confirmAction.type === "delete" ? (
+                  <Trash2 className="size-5" />
+                ) : (
+                  <AlertCircle className="size-5" />
+                )}
               </div>
-              <h2 className="text-lg font-semibold text-foreground">
-                {confirmAction.type === "delete" ? "Delete Account" : "Disconnect Account"}
+              <h2 className="text-foreground text-lg font-semibold">
+                {confirmAction.type === "delete"
+                  ? "Delete Account"
+                  : "Disconnect Account"}
               </h2>
             </div>
-            
+
             <div className="space-y-4">
-              <p className="text-sm text-muted-foreground">
-                {confirmAction.type === "delete" 
+              <p className="text-muted-foreground text-sm">
+                {confirmAction.type === "delete"
                   ? `Are you sure you want to permanently delete "${confirmAction.accountName}"? This action cannot be undone and will remove all associations.`
                   : `Are you sure you want to disconnect "${confirmAction.accountName}"? The account will remain in the system but API access will be revoked.`}
               </p>
 
               {confirmAction.type === "delete" && (
                 <div className="space-y-2">
-                  <Label htmlFor="confirm-input" className="text-xs uppercase tracking-wider text-muted-foreground">
-                    Type <span className="font-bold text-foreground select-none">{confirmAction.accountName}</span> to confirm
+                  <Label
+                    htmlFor="confirm-input"
+                    className="text-muted-foreground text-xs tracking-wider uppercase"
+                  >
+                    Type{" "}
+                    <span className="text-foreground font-bold select-none">
+                      {confirmAction.accountName}
+                    </span>{" "}
+                    to confirm
                   </Label>
                   <Input
                     id="confirm-input"
@@ -1168,12 +1334,23 @@ export function TikTokAccountsContent({ user }: TikTokAccountsContentProps) {
                   Cancel
                 </Button>
                 <Button
-                  variant={confirmAction.type === "delete" ? "destructive" : "default"}
+                  variant={
+                    confirmAction.type === "delete" ? "destructive" : "default"
+                  }
                   onClick={handleConfirm}
-                  disabled={confirmAction.type === "delete" && confirmInput !== confirmAction.accountName}
-                  className={confirmAction.type === "disconnect" ? "bg-amber-600 hover:bg-amber-700 text-white" : ""}
+                  disabled={
+                    confirmAction.type === "delete" &&
+                    confirmInput !== confirmAction.accountName
+                  }
+                  className={
+                    confirmAction.type === "disconnect"
+                      ? "bg-amber-600 text-white hover:bg-amber-700"
+                      : ""
+                  }
                 >
-                  {confirmAction.type === "delete" ? "Delete Permanently" : "Confirm Disconnect"}
+                  {confirmAction.type === "delete"
+                    ? "Delete Permanently"
+                    : "Confirm Disconnect"}
                 </Button>
               </div>
             </div>

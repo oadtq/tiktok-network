@@ -20,6 +20,34 @@ import { adminProcedure, protectedProcedure } from "../trpc";
 
 export const tiktokAccountRouter = {
   /**
+   * Get TikTok accounts assigned to the current user (creator-facing).
+   * Returns assignment metadata + basic account info (no tokens).
+   */
+  myAssigned: protectedProcedure.query(async ({ ctx }) => {
+    const links = await ctx.db.query.userTiktokAccount.findMany({
+      where: eq(userTiktokAccount.userId, ctx.session.user.id),
+      orderBy: desc(userTiktokAccount.createdAt),
+      with: {
+        tiktokAccount: {
+          columns: {
+            id: true,
+            name: true,
+            tiktokUsername: true,
+            followerCount: true,
+            cloudPhoneId: true,
+            isActive: true,
+          },
+        },
+      },
+    });
+
+    return links.map((l) => ({
+      assignedAt: l.createdAt,
+      ...l.tiktokAccount,
+    }));
+  }),
+
+  /**
    * List all TikTok accounts with linked cloud phone and users (admin only)
    */
   list: adminProcedure.query(async ({ ctx }) => {
@@ -112,7 +140,7 @@ export const tiktokAccountRouter = {
       z.object({
         id: z.string().uuid(),
         data: UpdateTiktokAccountSchema,
-      })
+      }),
     )
     .mutation(async ({ ctx, input }) => {
       const [updated] = await ctx.db
@@ -132,7 +160,7 @@ export const tiktokAccountRouter = {
       z.object({
         tiktokAccountId: z.string().uuid(),
         cloudPhoneId: z.string().nullable(),
-      })
+      }),
     )
     .mutation(async ({ ctx, input }) => {
       const [updated] = await ctx.db
@@ -193,7 +221,7 @@ export const tiktokAccountRouter = {
         },
       });
 
-      let totalVideos = accountClips.length;
+      const totalVideos = accountClips.length;
       let totalLikes = 0;
       let totalComments = 0;
       let totalShares = 0;
@@ -224,7 +252,7 @@ export const tiktokAccountRouter = {
         id: z.string().uuid(),
         limit: z.number().min(1).max(100).default(20),
         offset: z.number().min(0).default(0),
-      })
+      }),
     )
     .query(async ({ ctx, input }) => {
       const { id, limit, offset } = input;
@@ -286,14 +314,14 @@ export const tiktokAccountRouter = {
       z.object({
         tiktokAccountId: z.string().uuid(),
         userId: z.string(),
-      })
+      }),
     )
     .mutation(async ({ ctx, input }) => {
       // Check if already linked
       const existing = await ctx.db.query.userTiktokAccount.findFirst({
         where: and(
           eq(userTiktokAccount.tiktokAccountId, input.tiktokAccountId),
-          eq(userTiktokAccount.userId, input.userId)
+          eq(userTiktokAccount.userId, input.userId),
         ),
       });
 
@@ -317,7 +345,7 @@ export const tiktokAccountRouter = {
       z.object({
         tiktokAccountId: z.string().uuid(),
         userId: z.string(),
-      })
+      }),
     )
     .mutation(async ({ ctx, input }) => {
       await ctx.db
@@ -325,8 +353,8 @@ export const tiktokAccountRouter = {
         .where(
           and(
             eq(userTiktokAccount.tiktokAccountId, input.tiktokAccountId),
-            eq(userTiktokAccount.userId, input.userId)
-          )
+            eq(userTiktokAccount.userId, input.userId),
+          ),
         );
 
       return { success: true };

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Check,
   LayoutDashboard,
@@ -16,10 +16,10 @@ import {
 
 import { Button } from "@everylab/ui/button";
 
-import { useTRPC } from "~/trpc/react";
-import { Sidebar } from "~/components/sidebar";
 import type { NavItem } from "~/components/sidebar";
+import { Sidebar } from "~/components/sidebar";
 import { adminNavItems } from "~/config/navigation";
+import { useTRPC } from "~/trpc/react";
 
 interface User {
   id: string;
@@ -43,33 +43,39 @@ export function UsersContent({ user }: UsersContentProps) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
 
-  const { data: users, isLoading, refetch } = useQuery(
-    trpc.user.list.queryOptions()
-  );
+  const {
+    data: users,
+    isLoading,
+    refetch,
+  } = useQuery(trpc.user.list.queryOptions());
 
   const { data: availableAccounts } = useQuery(
     trpc.user.availableAccounts.queryOptions(
       { userId: selectedUserId ?? "" },
-      { enabled: !!selectedUserId && isLinkModalOpen }
-    )
+      { enabled: !!selectedUserId && isLinkModalOpen },
+    ),
   );
 
   const linkMutation = useMutation(
     trpc.user.linkAccount.mutationOptions({
       onSuccess: () => {
-        void queryClient.invalidateQueries({ queryKey: trpc.user.list.queryKey() });
+        void queryClient.invalidateQueries({
+          queryKey: trpc.user.list.queryKey(),
+        });
         setIsLinkModalOpen(false);
         setSelectedUserId(null);
       },
-    })
+    }),
   );
 
   const unlinkMutation = useMutation(
     trpc.user.unlinkAccount.mutationOptions({
       onSuccess: () => {
-        void queryClient.invalidateQueries({ queryKey: trpc.user.list.queryKey() });
+        void queryClient.invalidateQueries({
+          queryKey: trpc.user.list.queryKey(),
+        });
       },
-    })
+    }),
   );
 
   const handleLinkClick = (userId: string) => {
@@ -91,7 +97,9 @@ export function UsersContent({ user }: UsersContentProps) {
   };
 
   // Get pending count for badge
-  const { data: pendingClips = [] } = useQuery(trpc.admin.pendingClips.queryOptions());
+  const { data: pendingClips = [] } = useQuery(
+    trpc.admin.pendingClips.queryOptions(),
+  );
 
   // Add badge to Dashboard item
   const navItems: NavItem[] = adminNavItems.map((item) => {
@@ -102,7 +110,7 @@ export function UsersContent({ user }: UsersContentProps) {
   });
 
   return (
-    <div className="flex min-h-screen bg-background">
+    <div className="bg-background flex min-h-screen">
       <Sidebar
         user={{ ...user, role: "admin" }}
         title="Admin"
@@ -110,12 +118,12 @@ export function UsersContent({ user }: UsersContentProps) {
         items={navItems}
         bottomContent={
           <>
-            <p className="mb-2 px-3 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+            <p className="text-muted-foreground mb-2 px-3 text-xs font-medium tracking-wider uppercase">
               Switch View
             </p>
             <Link
               href="/dashboard"
-              className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+              className="text-muted-foreground hover:bg-accent hover:text-foreground flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors"
             >
               <Video className="size-5" />
               Creator Dashboard
@@ -127,11 +135,11 @@ export function UsersContent({ user }: UsersContentProps) {
       {/* Main Content */}
       <main className="flex-1 overflow-auto">
         {/* Header */}
-        <header className="sticky top-0 z-10 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <header className="border-border bg-background/95 supports-[backdrop-filter]:bg-background/60 sticky top-0 z-10 border-b backdrop-blur">
           <div className="flex h-16 items-center justify-between px-8">
             <div>
-              <h1 className="text-xl font-semibold text-foreground">Users</h1>
-              <p className="text-sm text-muted-foreground">
+              <h1 className="text-foreground text-xl font-semibold">Users</h1>
+              <p className="text-muted-foreground text-sm">
                 Manage users and their TikTok account assignments
               </p>
             </div>
@@ -142,7 +150,9 @@ export function UsersContent({ user }: UsersContentProps) {
                 onClick={() => void refetch()}
                 disabled={isLoading}
               >
-                <RefreshCw className={`size-4 ${isLoading ? "animate-spin" : ""}`} />
+                <RefreshCw
+                  className={`size-4 ${isLoading ? "animate-spin" : ""}`}
+                />
                 Refresh
               </Button>
             </div>
@@ -152,33 +162,33 @@ export function UsersContent({ user }: UsersContentProps) {
         <div className="p-8">
           {isLoading ? (
             <div className="flex items-center justify-center py-12">
-              <RefreshCw className="size-8 animate-spin text-muted-foreground" />
+              <RefreshCw className="text-muted-foreground size-8 animate-spin" />
             </div>
           ) : (
-            <div className="rounded-xl border border-border bg-card shadow-sm">
+            <div className="border-border bg-card rounded-xl border shadow-sm">
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead>
-                    <tr className="border-b border-border bg-muted/30">
-                      <th className="px-6 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                    <tr className="border-border bg-muted/30 border-b">
+                      <th className="text-muted-foreground px-6 py-3.5 text-left text-xs font-medium tracking-wider uppercase">
                         User
                       </th>
-                      <th className="px-6 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                      <th className="text-muted-foreground px-6 py-3.5 text-left text-xs font-medium tracking-wider uppercase">
                         Role
                       </th>
-                      <th className="px-6 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                      <th className="text-muted-foreground px-6 py-3.5 text-left text-xs font-medium tracking-wider uppercase">
                         Linked TikTok Accounts
                       </th>
-                      <th className="px-6 py-3.5 text-right text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                      <th className="text-muted-foreground px-6 py-3.5 text-right text-xs font-medium tracking-wider uppercase">
                         Actions
                       </th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-border">
+                  <tbody className="divide-border divide-y">
                     {users?.map((u) => (
                       <tr
                         key={u.id}
-                        className="group transition-colors hover:bg-muted/30"
+                        className="group hover:bg-muted/30 transition-colors"
                       >
                         <td className="px-6 py-4">
                           <div className="flex items-center gap-3">
@@ -186,10 +196,10 @@ export function UsersContent({ user }: UsersContentProps) {
                               {u.name.charAt(0).toUpperCase()}
                             </div>
                             <div>
-                              <p className="font-medium text-foreground">
+                              <p className="text-foreground font-medium">
                                 {u.name}
                               </p>
-                              <p className="text-xs text-muted-foreground">
+                              <p className="text-muted-foreground text-xs">
                                 {u.email}
                               </p>
                             </div>
@@ -198,7 +208,8 @@ export function UsersContent({ user }: UsersContentProps) {
                         <td className="px-6 py-4">
                           <span
                             className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${
-                              roleConfig[u.role]?.color ?? "bg-gray-100 text-gray-600"
+                              roleConfig[u.role]?.color ??
+                              "bg-gray-100 text-gray-600"
                             }`}
                           >
                             {roleConfig[u.role]?.label ?? u.role}
@@ -210,13 +221,15 @@ export function UsersContent({ user }: UsersContentProps) {
                               u.linkedAccounts.map((account) => (
                                 <div
                                   key={account.id}
-                                  className="flex items-center gap-1 rounded-full bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary"
+                                  className="bg-primary/10 text-primary flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium"
                                 >
-                                  <Check className="size-3" />
-                                  @{account.tiktokUsername}
+                                  <Check className="size-3" />@
+                                  {account.tiktokUsername}
                                   <button
-                                    onClick={() => handleUnlink(u.id, account.id)}
-                                    className="ml-1 rounded-full p-0.5 hover:bg-primary/20"
+                                    onClick={() =>
+                                      handleUnlink(u.id, account.id)
+                                    }
+                                    className="hover:bg-primary/20 ml-1 rounded-full p-0.5"
                                     title="Unlink account"
                                   >
                                     <X className="size-3" />
@@ -224,7 +237,7 @@ export function UsersContent({ user }: UsersContentProps) {
                                 </div>
                               ))
                             ) : (
-                              <span className="text-sm text-muted-foreground">
+                              <span className="text-muted-foreground text-sm">
                                 No accounts linked
                               </span>
                             )}
@@ -246,8 +259,8 @@ export function UsersContent({ user }: UsersContentProps) {
                     {(!users || users.length === 0) && (
                       <tr>
                         <td colSpan={4} className="px-6 py-12 text-center">
-                          <Users className="mx-auto size-12 text-muted-foreground/50" />
-                          <p className="mt-4 text-sm text-muted-foreground">
+                          <Users className="text-muted-foreground/50 mx-auto size-12" />
+                          <p className="text-muted-foreground mt-4 text-sm">
                             No users found
                           </p>
                         </td>
@@ -264,9 +277,9 @@ export function UsersContent({ user }: UsersContentProps) {
       {/* Link Account Modal */}
       {isLinkModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="w-full max-w-md rounded-xl bg-card p-6 shadow-lg">
+          <div className="bg-card w-full max-w-md rounded-xl p-6 shadow-lg">
             <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-foreground">
+              <h2 className="text-foreground text-lg font-semibold">
                 Link TikTok Account
               </h2>
               <button
@@ -274,7 +287,7 @@ export function UsersContent({ user }: UsersContentProps) {
                   setIsLinkModalOpen(false);
                   setSelectedUserId(null);
                 }}
-                className="rounded-lg p-2 text-muted-foreground hover:bg-accent"
+                className="text-muted-foreground hover:bg-accent rounded-lg p-2"
               >
                 <X className="size-4" />
               </button>
@@ -284,14 +297,16 @@ export function UsersContent({ user }: UsersContentProps) {
                 <button
                   key={account.id}
                   onClick={() => handleLinkAccount(account.id)}
-                  className="flex w-full items-center gap-3 rounded-lg border border-border p-3 text-left transition-colors hover:bg-muted/50"
+                  className="border-border hover:bg-muted/50 flex w-full items-center gap-3 rounded-lg border p-3 text-left transition-colors"
                 >
                   <div className="flex size-10 items-center justify-center rounded-full bg-gradient-to-br from-pink-500 to-purple-600 text-sm font-medium text-white">
                     {account.name.charAt(0).toUpperCase()}
                   </div>
                   <div>
-                    <p className="font-medium text-foreground">{account.name}</p>
-                    <p className="text-sm text-muted-foreground">
+                    <p className="text-foreground font-medium">
+                      {account.name}
+                    </p>
+                    <p className="text-muted-foreground text-sm">
                       @{account.tiktokUsername}
                     </p>
                   </div>
@@ -304,7 +319,7 @@ export function UsersContent({ user }: UsersContentProps) {
                 </button>
               ))}
               {(!availableAccounts || availableAccounts.length === 0) && (
-                <p className="py-4 text-center text-sm text-muted-foreground">
+                <p className="text-muted-foreground py-4 text-center text-sm">
                   No available TikTok accounts to link
                 </p>
               )}

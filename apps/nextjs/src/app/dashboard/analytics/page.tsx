@@ -1,16 +1,14 @@
 import { redirect } from "next/navigation";
 
 import { getSession } from "~/auth/server";
+import { AnalyticsContent } from "../_components/analytics-content";
 
-import { StatisticsContent } from "../_components/statistics-content";
-
-export default async function StatisticsPage() {
+export default async function AnalyticsPage() {
   const session = await getSession();
 
   if (!session) {
     redirect("/auth/signin");
   }
 
-  return <StatisticsContent user={session.user} />;
+  return <AnalyticsContent user={session.user} />;
 }
-

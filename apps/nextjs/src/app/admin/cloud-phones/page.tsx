@@ -1,7 +1,6 @@
 import { redirect } from "next/navigation";
 
 import { getSession } from "~/auth/server";
-
 import { CloudPhonesContent } from "./_components/cloud-phones-content";
 
 export default async function CloudPhonesPage() {

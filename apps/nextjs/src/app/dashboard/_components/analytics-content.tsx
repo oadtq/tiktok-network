@@ -1,5 +1,6 @@
 "use client";
 
+import { useQuery } from "@tanstack/react-query";
 import {
   Eye,
   Heart,
@@ -8,13 +9,12 @@ import {
   Share2,
   Video,
 } from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
 
 import { Button } from "@everylab/ui/button";
 
-import { useTRPC } from "~/trpc/react";
 import { Sidebar } from "~/components/sidebar";
 import { creatorNavItems } from "~/config/navigation";
+import { useTRPC } from "~/trpc/react";
 
 interface User {
   id: string;
@@ -22,16 +22,14 @@ interface User {
   email: string;
 }
 
-interface StatisticsContentProps {
+interface AnalyticsContentProps {
   user: User;
 }
 
 const statusConfig = {
   draft: { color: "bg-gray-100 text-gray-600", label: "Draft" },
-  submitted: { color: "bg-amber-50 text-amber-600", label: "Pending Review" },
+  pending: { color: "bg-amber-50 text-amber-600", label: "Pending" },
   approved: { color: "bg-blue-50 text-blue-600", label: "Approved" },
-  rejected: { color: "bg-red-50 text-red-600", label: "Rejected" },
-  publishing: { color: "bg-purple-50 text-purple-600", label: "Publishing" },
   published: { color: "bg-emerald-50 text-emerald-600", label: "Published" },
   failed: { color: "bg-red-50 text-red-700", label: "Failed" },
 };
@@ -51,13 +49,13 @@ function StatCard({
   isLoading?: boolean;
 }) {
   return (
-    <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
+    <div className="border-border bg-card rounded-xl border p-5 shadow-sm">
       <div className="flex items-start justify-between">
         <div className="flex-1">
-          <p className="text-sm font-medium text-muted-foreground">{title}</p>
-          <p className="mt-2 text-2xl font-semibold tracking-tight text-foreground">
+          <p className="text-muted-foreground text-sm font-medium">{title}</p>
+          <p className="text-foreground mt-2 text-2xl font-semibold tracking-tight">
             {isLoading ? (
-              <span className="inline-block h-8 w-20 animate-pulse rounded bg-muted" />
+              <span className="bg-muted inline-block h-8 w-20 animate-pulse rounded" />
             ) : typeof value === "number" ? (
               value.toLocaleString()
             ) : (
@@ -76,19 +74,26 @@ function StatCard({
   );
 }
 
-export function StatisticsContent({ user }: StatisticsContentProps) {
+export function AnalyticsContent({ user }: AnalyticsContentProps) {
   const trpc = useTRPC();
 
-  // Query for user's clips with stats
+  // Query for clips stats scoped to the TikTok account(s) assigned to this user
   const { data, isLoading, refetch, isRefetching } = useQuery(
-    trpc.tiktokStats.getUserClipsStats.queryOptions()
+    trpc.tiktokStats.getAssignedAccountClipsStats.queryOptions(),
   );
 
   const totals = data?.totals ?? { views: 0, likes: 0, comments: 0, shares: 0 };
   const clips = data?.clips ?? [];
+  const assignedAccounts = data?.assignedAccounts ?? [];
+  const assignmentLabel =
+    assignedAccounts.length === 0
+      ? null
+      : assignedAccounts.length === 1
+        ? `@${assignedAccounts[0]?.tiktokUsername ?? ""}`
+        : `${assignedAccounts.length} accounts`;
 
   return (
-    <div className="flex min-h-screen bg-background">
+    <div className="bg-background flex min-h-screen">
       <Sidebar
         user={user}
         title="Creator"
@@ -96,7 +101,7 @@ export function StatisticsContent({ user }: StatisticsContentProps) {
         items={creatorNavItems}
         bottomContent={
           <>
-            <p className="mb-2 px-3 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+            <p className="text-muted-foreground mb-2 px-3 text-xs font-medium tracking-wider uppercase">
               Support
             </p>
           </>
@@ -109,9 +114,12 @@ export function StatisticsContent({ user }: StatisticsContentProps) {
           {/* Header with Refresh */}
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-2xl font-semibold text-foreground">Statistics</h1>
-              <p className="text-sm text-muted-foreground">
-                Track the performance of your published clips
+              <h1 className="text-foreground text-2xl font-semibold">
+                Analytics
+              </h1>
+              <p className="text-muted-foreground text-sm">
+                Track performance for your assigned TikTok account
+                {assignmentLabel ? ` (${assignmentLabel})` : ""}
               </p>
             </div>
             <Button
@@ -121,7 +129,9 @@ export function StatisticsContent({ user }: StatisticsContentProps) {
               disabled={isRefetching}
               className="gap-2"
             >
-              <RefreshCw className={`size-4 ${isRefetching ? "animate-spin" : ""}`} />
+              <RefreshCw
+                className={`size-4 ${isRefetching ? "animate-spin" : ""}`}
+              />
               Refresh
             </Button>
           </div>
@@ -159,39 +169,41 @@ export function StatisticsContent({ user }: StatisticsContentProps) {
           </div>
 
           {/* Per-Clip Stats Table */}
-          <div className="rounded-xl border border-border bg-card shadow-sm">
-            <div className="border-b border-border p-4">
-              <h2 className="font-semibold text-foreground">Clip Performance</h2>
+          <div className="border-border bg-card rounded-xl border shadow-sm">
+            <div className="border-border border-b p-4">
+              <h2 className="text-foreground font-semibold">
+                Clip Performance
+              </h2>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
-                  <tr className="border-b border-border bg-muted/30">
-                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                  <tr className="border-border bg-muted/30 border-b">
+                    <th className="text-muted-foreground px-4 py-3 text-left text-xs font-medium tracking-wider uppercase">
                       Title
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                    <th className="text-muted-foreground px-4 py-3 text-left text-xs font-medium tracking-wider uppercase">
                       Status
                     </th>
-                    <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                    <th className="text-muted-foreground px-4 py-3 text-right text-xs font-medium tracking-wider uppercase">
                       <div className="flex items-center justify-end gap-1">
                         <Eye className="size-3" />
                         Views
                       </div>
                     </th>
-                    <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                    <th className="text-muted-foreground px-4 py-3 text-right text-xs font-medium tracking-wider uppercase">
                       <div className="flex items-center justify-end gap-1">
                         <Heart className="size-3" />
                         Likes
                       </div>
                     </th>
-                    <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                    <th className="text-muted-foreground px-4 py-3 text-right text-xs font-medium tracking-wider uppercase">
                       <div className="flex items-center justify-end gap-1">
                         <MessageCircle className="size-3" />
                         Comments
                       </div>
                     </th>
-                    <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                    <th className="text-muted-foreground px-4 py-3 text-right text-xs font-medium tracking-wider uppercase">
                       <div className="flex items-center justify-end gap-1">
                         <Share2 className="size-3" />
                         Shares
@@ -199,26 +211,36 @@ export function StatisticsContent({ user }: StatisticsContentProps) {
                     </th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-border">
+                <tbody className="divide-border divide-y">
                   {isLoading ? (
                     <tr>
-                      <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">
+                      <td
+                        colSpan={6}
+                        className="text-muted-foreground px-4 py-8 text-center"
+                      >
                         Loading statistics...
                       </td>
                     </tr>
                   ) : clips.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">
-                        No clips found. Upload your first clip to see statistics here.
+                      <td
+                        colSpan={6}
+                        className="text-muted-foreground px-4 py-8 text-center"
+                      >
+                        {assignedAccounts.length === 0
+                          ? "No TikTok account assigned. Ask an admin to link you to an account."
+                          : "No clips found for your assigned TikTok account yet."}
                       </td>
                     </tr>
                   ) : (
                     clips.map((clip) => (
                       <tr key={clip.id} className="hover:bg-muted/30">
                         <td className="px-4 py-3">
-                          <p className="font-medium text-foreground">{clip.title}</p>
+                          <p className="text-foreground font-medium">
+                            {clip.title}
+                          </p>
                           {clip.tiktokAccount && (
-                            <p className="text-xs text-muted-foreground">
+                            <p className="text-muted-foreground text-xs">
                               @{clip.tiktokAccount.tiktokUsername}
                             </p>
                           )}
@@ -232,16 +254,16 @@ export function StatisticsContent({ user }: StatisticsContentProps) {
                             {statusConfig[clip.status].label}
                           </span>
                         </td>
-                        <td className="px-4 py-3 text-right tabular-nums text-foreground">
+                        <td className="text-foreground px-4 py-3 text-right tabular-nums">
                           {clip.stats?.views.toLocaleString() ?? "-"}
                         </td>
-                        <td className="px-4 py-3 text-right tabular-nums text-foreground">
+                        <td className="text-foreground px-4 py-3 text-right tabular-nums">
                           {clip.stats?.likes.toLocaleString() ?? "-"}
                         </td>
-                        <td className="px-4 py-3 text-right tabular-nums text-foreground">
+                        <td className="text-foreground px-4 py-3 text-right tabular-nums">
                           {clip.stats?.comments.toLocaleString() ?? "-"}
                         </td>
-                        <td className="px-4 py-3 text-right tabular-nums text-foreground">
+                        <td className="text-foreground px-4 py-3 text-right tabular-nums">
                           {clip.stats?.shares.toLocaleString() ?? "-"}
                         </td>
                       </tr>
@@ -256,8 +278,9 @@ export function StatisticsContent({ user }: StatisticsContentProps) {
           {clips.length > 0 && (
             <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-800">
               <p>
-                <strong>Note:</strong> Statistics are synced from TikTok periodically. 
-                If you recently published a clip, stats may take a few minutes to appear.
+                <strong>Note:</strong> Statistics are synced from TikTok
+                periodically. If you recently published a clip, stats may take a
+                few minutes to appear.
               </p>
             </div>
           )}

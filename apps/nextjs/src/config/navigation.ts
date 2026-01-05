@@ -1,5 +1,7 @@
 import {
   BarChart3,
+  Bot,
+  FileVideo,
   Home,
   Smartphone,
   Users,
@@ -28,8 +30,18 @@ export const adminNavItems = [
     icon: Users,
   },
   {
-    label: "Statistics",
-    href: "/admin/statistics",
+    label: "All Clips",
+    href: "/admin/clips",
+    icon: FileVideo,
+  },
+  {
+    label: "Automations",
+    href: "/admin/automations",
+    icon: Bot,
+  },
+  {
+    label: "Analytics",
+    href: "/admin/analytics",
     icon: BarChart3,
   },
 ];
@@ -41,8 +53,8 @@ export const creatorNavItems = [
     icon: Home,
   },
   {
-    label: "Statistics",
-    href: "/dashboard/statistics",
+    label: "Analytics",
+    href: "/dashboard/analytics",
     icon: BarChart3,
   },
 ];

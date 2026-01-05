@@ -2,20 +2,21 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   BarChart3,
-  Clock,
+  Bot,
+  Check,
   FileVideo,
   Home,
   LayoutDashboard,
   LogOut,
-  Megaphone,
   Play,
   RefreshCw,
   Smartphone,
   Users,
   Video,
+  X,
 } from "lucide-react";
 
 import { Button } from "@everylab/ui/button";
@@ -33,25 +34,27 @@ interface AdminClipsContentProps {
   user: User;
 }
 
-type StatusFilter = "all" | "draft" | "submitted" | "approved" | "rejected" | "publishing" | "published" | "failed";
+type StatusFilter =
+  | "all"
+  | "draft"
+  | "pending"
+  | "approved"
+  | "published"
+  | "failed";
 
 const statusLabels: Record<StatusFilter, string> = {
   all: "All",
   draft: "Draft",
-  submitted: "Pending",
+  pending: "Pending",
   approved: "Approved",
-  rejected: "Rejected",
-  publishing: "Publishing",
   published: "Published",
   failed: "Failed",
 };
 
 const statusColors: Record<string, string> = {
   draft: "bg-gray-100 text-gray-700",
-  submitted: "bg-amber-100 text-amber-700",
+  pending: "bg-amber-100 text-amber-700",
   approved: "bg-emerald-100 text-emerald-700",
-  rejected: "bg-red-100 text-red-700",
-  publishing: "bg-blue-100 text-blue-700",
   published: "bg-green-100 text-green-700",
   failed: "bg-red-100 text-red-700",
 };
@@ -98,30 +101,89 @@ function NavItem({
   );
 }
 
+interface ApproveModalState {
+  isOpen: boolean;
+  clipId: string | null;
+  title: string;
+  description: string;
+}
+
 export function AdminClipsContent({ user }: AdminClipsContentProps) {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [modal, setModal] = useState<ApproveModalState>({
+    isOpen: false,
+    clipId: null,
+    title: "",
+    description: "",
+  });
 
   const trpc = useTRPC();
+  const queryClient = useQueryClient();
 
-  const { data: clipsData, isLoading, refetch } = useQuery(
+  const {
+    data: clipsData,
+    isLoading,
+    refetch,
+  } = useQuery(
     trpc.admin.allClips.queryOptions(
-      statusFilter === "all" ? undefined : { status: statusFilter }
-    )
+      statusFilter === "all" ? undefined : { status: statusFilter },
+    ),
   );
 
-  // For pending badge count
-  const { data: pendingClips } = useQuery(
-    trpc.admin.pendingClips.queryOptions()
+  const pendingCount =
+    clipsData?.clips.filter((c) => c.status === "pending").length ?? 0;
+
+  const approveMutation = useMutation(
+    trpc.admin.approveClip.mutationOptions({
+      onSuccess: () => {
+        void queryClient.invalidateQueries({
+          queryKey: trpc.admin.allClips.queryKey(),
+        });
+        closeModal();
+      },
+    }),
   );
+
+  const openModal = (clip: {
+    id: string;
+    title: string;
+    description: string | null;
+  }) => {
+    setModal({
+      isOpen: true,
+      clipId: clip.id,
+      title: clip.title,
+      description: clip.description ?? "",
+    });
+  };
+
+  const closeModal = () => {
+    setModal({
+      isOpen: false,
+      clipId: null,
+      title: "",
+      description: "",
+    });
+  };
+
+  const handleApprove = () => {
+    if (modal.clipId) {
+      approveMutation.mutate({
+        clipId: modal.clipId,
+        title: modal.title,
+        description: modal.description,
+      });
+    }
+  };
 
   return (
-    <div className="flex min-h-screen bg-background">
+    <div className="bg-background flex min-h-screen">
       {/* Sidebar */}
-      <aside className="sticky top-0 flex h-screen w-64 shrink-0 flex-col border-r border-border bg-sidebar">
+      <aside className="border-border bg-sidebar sticky top-0 flex h-screen w-64 shrink-0 flex-col border-r">
         {/* Logo */}
-        <div className="flex h-16 items-center gap-3 border-b border-border px-6">
-          <div className="flex size-8 items-center justify-center rounded-lg bg-primary">
-            <LayoutDashboard className="size-4 text-primary-foreground" />
+        <div className="border-border flex h-16 items-center gap-3 border-b px-6">
+          <div className="bg-primary flex size-8 items-center justify-center rounded-lg">
+            <LayoutDashboard className="text-primary-foreground size-4" />
           </div>
           <span className="text-lg font-semibold tracking-tight">Admin</span>
         </div>
@@ -129,44 +191,48 @@ export function AdminClipsContent({ user }: AdminClipsContentProps) {
         {/* Navigation */}
         <nav className="flex-1 space-y-1 p-4">
           <NavItem icon={Home} label="Dashboard" href="/admin" />
-          <NavItem icon={Smartphone} label="Cloud Phones" href="/admin/cloud-phones" />
-          <NavItem icon={Users} label="Users" href="/admin/users" />
-          <NavItem icon={FileVideo} label="All Clips" active href="/admin/clips" />
           <NavItem
-            icon={Clock}
-            label="Submissions"
-            href="/admin/submissions"
-            badge={pendingClips?.length}
+            icon={Smartphone}
+            label="Cloud Phones"
+            href="/admin/cloud-phones"
           />
-          <NavItem icon={Megaphone} label="Campaigns" href="/admin/campaigns" />
+          <NavItem icon={Users} label="Users" href="/admin/users" />
+          <NavItem
+            icon={FileVideo}
+            label="All Clips"
+            active
+            href="/admin/clips"
+            badge={pendingCount > 0 ? pendingCount : undefined}
+          />
           <NavItem icon={BarChart3} label="Analytics" href="/admin/analytics" />
+          <NavItem icon={Bot} label="Automations" href="/admin/automations" />
 
-          <div className="my-4 border-t border-border" />
+          <div className="border-border my-4 border-t" />
 
-          <p className="mb-2 px-3 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+          <p className="text-muted-foreground mb-2 px-3 text-xs font-medium tracking-wider uppercase">
             Switch View
           </p>
           <NavItem icon={Video} label="Creator Dashboard" href="/dashboard" />
         </nav>
 
         {/* User Profile */}
-        <div className="border-t border-border p-4">
+        <div className="border-border border-t p-4">
           <div className="flex items-center gap-3">
             <div className="flex size-9 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 text-sm font-medium text-white">
               {user.name.charAt(0).toUpperCase()}
             </div>
             <div className="flex-1 overflow-hidden">
-              <p className="truncate text-sm font-medium text-foreground">
+              <p className="text-foreground truncate text-sm font-medium">
                 {user.name}
               </p>
-              <p className="truncate text-xs text-muted-foreground">Admin</p>
+              <p className="text-muted-foreground truncate text-xs">Admin</p>
             </div>
             <button
               onClick={async () => {
                 await authClient.signOut();
                 window.location.href = "/";
               }}
-              className="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+              className="text-muted-foreground hover:bg-accent hover:text-foreground rounded-lg p-2 transition-colors"
               title="Sign out"
             >
               <LogOut className="size-4" />
@@ -178,14 +244,14 @@ export function AdminClipsContent({ user }: AdminClipsContentProps) {
       {/* Main Content */}
       <main className="flex-1 overflow-auto">
         {/* Header */}
-        <header className="sticky top-0 z-10 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <header className="border-border bg-background/95 supports-[backdrop-filter]:bg-background/60 sticky top-0 z-10 border-b backdrop-blur">
           <div className="flex h-16 items-center justify-between px-8">
             <div>
-              <h1 className="text-xl font-semibold text-foreground">
+              <h1 className="text-foreground text-xl font-semibold">
                 All Clips
               </h1>
-              <p className="text-sm text-muted-foreground">
-                View all clips uploaded by users ({clipsData?.total ?? 0} total)
+              <p className="text-muted-foreground text-sm">
+                View and manage all clips ({clipsData?.total ?? 0} total)
               </p>
             </div>
             <div className="flex items-center gap-3">
@@ -195,7 +261,9 @@ export function AdminClipsContent({ user }: AdminClipsContentProps) {
                 onClick={() => void refetch()}
                 disabled={isLoading}
               >
-                <RefreshCw className={`size-4 ${isLoading ? "animate-spin" : ""}`} />
+                <RefreshCw
+                  className={`size-4 ${isLoading ? "animate-spin" : ""}`}
+                />
                 Refresh
               </Button>
             </div>
@@ -209,28 +277,33 @@ export function AdminClipsContent({ user }: AdminClipsContentProps) {
               <button
                 key={status}
                 onClick={() => setStatusFilter(status)}
-                className={`whitespace-nowrap rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
+                className={`rounded-lg px-4 py-2 text-sm font-medium whitespace-nowrap transition-colors ${
                   statusFilter === status
                     ? "bg-primary text-primary-foreground"
                     : "bg-muted text-muted-foreground hover:bg-accent hover:text-foreground"
                 }`}
               >
                 {statusLabels[status]}
+                {status === "pending" && pendingCount > 0 && (
+                  <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-700">
+                    {pendingCount}
+                  </span>
+                )}
               </button>
             ))}
           </div>
 
           {isLoading ? (
             <div className="flex items-center justify-center py-12">
-              <RefreshCw className="size-8 animate-spin text-muted-foreground" />
+              <RefreshCw className="text-muted-foreground size-8 animate-spin" />
             </div>
           ) : clipsData?.clips.length === 0 ? (
-            <div className="flex flex-col items-center justify-center rounded-xl border border-border bg-card py-16">
-              <Video className="size-12 text-muted-foreground" />
-              <h3 className="mt-4 text-lg font-semibold text-foreground">
+            <div className="border-border bg-card flex flex-col items-center justify-center rounded-xl border py-16">
+              <Video className="text-muted-foreground size-12" />
+              <h3 className="text-foreground mt-4 text-lg font-semibold">
                 No clips found
               </h3>
-              <p className="mt-1 text-sm text-muted-foreground">
+              <p className="text-muted-foreground mt-1 text-sm">
                 {statusFilter === "all"
                   ? "No clips have been uploaded yet"
                   : `No clips with status "${statusLabels[statusFilter]}"`}
@@ -241,10 +314,10 @@ export function AdminClipsContent({ user }: AdminClipsContentProps) {
               {clipsData?.clips.map((clip) => (
                 <div
                   key={clip.id}
-                  className="overflow-hidden rounded-xl border border-border bg-card shadow-sm transition-shadow hover:shadow-md"
+                  className="border-border bg-card overflow-hidden rounded-xl border shadow-sm transition-shadow hover:shadow-md"
                 >
                   {/* Video Preview */}
-                  <div className="relative aspect-video bg-muted">
+                  <div className="bg-muted relative aspect-video">
                     <video
                       src={clip.videoUrl}
                       className="size-full object-cover"
@@ -255,7 +328,7 @@ export function AdminClipsContent({ user }: AdminClipsContentProps) {
                       <Play className="size-12 text-white" />
                     </button>
                     {/* Status Badge */}
-                    <div className="absolute right-2 top-2">
+                    <div className="absolute top-2 right-2">
                       <span
                         className={`rounded-full px-2.5 py-1 text-xs font-medium ${
                           statusColors[clip.status]
@@ -268,65 +341,83 @@ export function AdminClipsContent({ user }: AdminClipsContentProps) {
 
                   {/* Content */}
                   <div className="p-4">
-                    <h3 className="line-clamp-1 font-semibold text-foreground">
+                    <h3 className="text-foreground line-clamp-1 font-semibold">
                       {clip.title}
                     </h3>
-                    <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">
+                    <p className="text-muted-foreground mt-1 line-clamp-2 text-sm">
                       {clip.description ?? "No description"}
                     </p>
 
-                    {/* Uploader Info - Prominent */}
-                    <div className="mt-3 flex items-center gap-2 rounded-lg bg-muted/50 px-3 py-2">
+                    {/* Uploader Info */}
+                    <div className="bg-muted/50 mt-3 flex items-center gap-2 rounded-lg px-3 py-2">
                       <div className="flex size-6 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-purple-600 text-xs font-medium text-white">
                         {clip.user.name.charAt(0).toUpperCase()}
                       </div>
                       <div className="flex-1 overflow-hidden">
-                        <p className="truncate text-sm font-medium text-foreground">
+                        <p className="text-foreground truncate text-sm font-medium">
                           {clip.user.name}
                         </p>
-                        <p className="truncate text-xs text-muted-foreground">
+                        <p className="text-muted-foreground truncate text-xs">
                           {clip.user.email}
                         </p>
                       </div>
                     </div>
 
                     {clip.tiktokAccount && (
-                      <div className="mt-2 flex items-center gap-1 text-xs text-muted-foreground">
-                        <Video className="size-3" />
-                        @{clip.tiktokAccount.tiktokUsername}
+                      <div className="text-muted-foreground mt-2 flex items-center gap-1 text-xs">
+                        <Video className="size-3" />@
+                        {clip.tiktokAccount.tiktokUsername}
                       </div>
                     )}
 
-                    <div className="mt-2 text-xs text-muted-foreground">
+                    <div className="text-muted-foreground mt-2 text-xs">
                       Created: {new Date(clip.createdAt).toLocaleDateString()}
                     </div>
 
-                    {/* Stats if available */}
+                    {/* Approve Button for Pending */}
+                    {clip.status === "pending" && (
+                      <div className="mt-4">
+                        <Button
+                          size="sm"
+                          className="w-full gap-1"
+                          onClick={() => openModal(clip)}
+                        >
+                          <Check className="size-3" />
+                          Review & Approve
+                        </Button>
+                      </div>
+                    )}
+
+                    {/* Stats for published */}
                     {clip.latestStats && (
                       <div className="mt-3 grid grid-cols-4 gap-2 text-center">
                         <div>
-                          <p className="text-sm font-semibold text-foreground">
+                          <p className="text-foreground text-sm font-semibold">
                             {clip.latestStats.views.toLocaleString()}
                           </p>
-                          <p className="text-xs text-muted-foreground">Views</p>
+                          <p className="text-muted-foreground text-xs">Views</p>
                         </div>
                         <div>
-                          <p className="text-sm font-semibold text-foreground">
+                          <p className="text-foreground text-sm font-semibold">
                             {clip.latestStats.likes.toLocaleString()}
                           </p>
-                          <p className="text-xs text-muted-foreground">Likes</p>
+                          <p className="text-muted-foreground text-xs">Likes</p>
                         </div>
                         <div>
-                          <p className="text-sm font-semibold text-foreground">
+                          <p className="text-foreground text-sm font-semibold">
                             {clip.latestStats.comments.toLocaleString()}
                           </p>
-                          <p className="text-xs text-muted-foreground">Comments</p>
+                          <p className="text-muted-foreground text-xs">
+                            Comments
+                          </p>
                         </div>
                         <div>
-                          <p className="text-sm font-semibold text-foreground">
+                          <p className="text-foreground text-sm font-semibold">
                             {clip.latestStats.shares.toLocaleString()}
                           </p>
-                          <p className="text-xs text-muted-foreground">Shares</p>
+                          <p className="text-muted-foreground text-xs">
+                            Shares
+                          </p>
                         </div>
                       </div>
                     )}
@@ -337,6 +428,84 @@ export function AdminClipsContent({ user }: AdminClipsContentProps) {
           )}
         </div>
       </main>
+
+      {/* Approve Modal */}
+      {modal.isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-card w-full max-w-lg rounded-xl p-6 shadow-lg">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-foreground text-lg font-semibold">
+                Review & Approve
+              </h2>
+              <button
+                onClick={closeModal}
+                className="text-muted-foreground hover:bg-accent rounded-lg p-2"
+              >
+                <X className="size-4" />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="text-foreground mb-2 block text-sm font-medium">
+                  Title
+                </label>
+                <input
+                  type="text"
+                  value={modal.title}
+                  onChange={(e) =>
+                    setModal((prev) => ({ ...prev, title: e.target.value }))
+                  }
+                  className="border-border bg-background text-foreground focus:border-primary focus:ring-primary w-full rounded-lg border px-4 py-2.5 focus:ring-1 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="text-foreground mb-2 block text-sm font-medium">
+                  Description (TikTok Caption)
+                </label>
+                <textarea
+                  value={modal.description}
+                  onChange={(e) =>
+                    setModal((prev) => ({
+                      ...prev,
+                      description: e.target.value,
+                    }))
+                  }
+                  rows={4}
+                  className="border-border bg-background text-foreground focus:border-primary focus:ring-primary w-full rounded-lg border px-4 py-2.5 focus:ring-1 focus:outline-none"
+                />
+              </div>
+
+              <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4">
+                <p className="text-sm text-emerald-800">
+                  Approving will create a publish task on GeeLark. The video
+                  will be published to TikTok via the linked cloud phone.
+                </p>
+              </div>
+
+              <div className="flex gap-3">
+                <Button
+                  variant="outline"
+                  onClick={closeModal}
+                  className="flex-1"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleApprove}
+                  disabled={approveMutation.isPending}
+                  className="flex-1"
+                >
+                  {approveMutation.isPending
+                    ? "Approving..."
+                    : "Approve & Publish"}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

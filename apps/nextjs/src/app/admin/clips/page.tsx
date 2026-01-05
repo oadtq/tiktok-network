@@ -1,7 +1,6 @@
 import { redirect } from "next/navigation";
 
 import { getSession } from "~/auth/server";
-
 import { AdminClipsContent } from "./_components/admin-clips-content";
 
 export default async function AdminClipsPage() {

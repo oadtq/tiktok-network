@@ -6,8 +6,13 @@
 import type { TRPCRouterRecord } from "@trpc/server";
 import { z } from "zod/v4";
 
-import { desc, eq } from "@everylab/db";
-import { clip, clipStats, tiktokAccount } from "@everylab/db/schema";
+import { desc, eq, inArray } from "@everylab/db";
+import {
+  clip,
+  clipStats,
+  tiktokAccount,
+  userTiktokAccount,
+} from "@everylab/db/schema";
 import {
   createTikTokClient,
   isTikTokConfigured,
@@ -60,7 +65,10 @@ export const tiktokStatsRouter = {
       });
 
       if (publishedClips.length === 0) {
-        console.log("[TikTok Stats] No published clips for account:", account.id);
+        console.log(
+          "[TikTok Stats] No published clips for account:",
+          account.id,
+        );
         return { synced: 0 };
       }
 
@@ -76,10 +84,17 @@ export const tiktokStatsRouter = {
         throw new Error("Failed to fetch videos from TikTok");
       }
 
-      console.log("[TikTok Stats] Fetched", videos.length, "videos from TikTok");
+      console.log(
+        "[TikTok Stats] Fetched",
+        videos.length,
+        "videos from TikTok",
+      );
 
       // Create a map of TikTok video ID to stats
-      const videoStatsMap = new Map<string, { views: number; likes: number; comments: number; shares: number }>(
+      const videoStatsMap = new Map<
+        string,
+        { views: number; likes: number; comments: number; shares: number }
+      >(
         videos.map((v) => [
           v.id,
           {
@@ -88,7 +103,7 @@ export const tiktokStatsRouter = {
             comments: v.comment_count ?? 0,
             shares: v.share_count ?? 0,
           },
-        ])
+        ]),
       );
 
       // Update stats for each published clip
@@ -153,9 +168,10 @@ export const tiktokStatsRouter = {
       // Query the specific video
       let videos;
       try {
-        videos = await client.queryVideos(existingClip.tiktokAccount.accessToken, [
-          existingClip.tiktokVideoId,
-        ]);
+        videos = await client.queryVideos(
+          existingClip.tiktokAccount.accessToken,
+          [existingClip.tiktokVideoId],
+        );
       } catch (error) {
         console.error("[TikTok Stats] Failed to query video:", error);
         throw new Error("Failed to fetch video stats from TikTok");
@@ -240,6 +256,98 @@ export const tiktokStatsRouter = {
     });
 
     return {
+      totals: {
+        views: totalViews,
+        likes: totalLikes,
+        comments: totalComments,
+        shares: totalShares,
+      },
+      clips: clipsWithStats,
+    };
+  }),
+
+  /**
+   * Get stats for clips published under TikTok account(s) assigned to the current user.
+   * This is account-scoped (not "my uploads").
+   */
+  getAssignedAccountClipsStats: protectedProcedure.query(async ({ ctx }) => {
+    const links = await ctx.db.query.userTiktokAccount.findMany({
+      where: eq(userTiktokAccount.userId, ctx.session.user.id),
+      orderBy: desc(userTiktokAccount.createdAt),
+      with: {
+        tiktokAccount: {
+          columns: {
+            id: true,
+            name: true,
+            tiktokUsername: true,
+          },
+        },
+      },
+    });
+
+    const assignedAccounts = links.map((l) => l.tiktokAccount);
+    const assignedAccountIds = assignedAccounts.map((a) => a.id);
+
+    if (assignedAccountIds.length === 0) {
+      return {
+        assignedAccounts: [],
+        totals: { views: 0, likes: 0, comments: 0, shares: 0 },
+        clips: [],
+      };
+    }
+
+    const accountClips = await ctx.db.query.clip.findMany({
+      where: inArray(clip.tiktokAccountId, assignedAccountIds),
+      orderBy: desc(clip.createdAt),
+      with: {
+        stats: {
+          orderBy: desc(clipStats.recordedAt),
+          limit: 1,
+        },
+        tiktokAccount: {
+          columns: {
+            id: true,
+            name: true,
+            tiktokUsername: true,
+          },
+        },
+      },
+    });
+
+    let totalViews = 0;
+    let totalLikes = 0;
+    let totalComments = 0;
+    let totalShares = 0;
+
+    const clipsWithStats = accountClips.map((c) => {
+      const latestStats = c.stats[0];
+      if (latestStats) {
+        totalViews += latestStats.views;
+        totalLikes += latestStats.likes;
+        totalComments += latestStats.comments;
+        totalShares += latestStats.shares;
+      }
+
+      return {
+        id: c.id,
+        title: c.title,
+        status: c.status,
+        createdAt: c.createdAt,
+        publishedAt: c.publishedAt,
+        tiktokAccount: c.tiktokAccount,
+        stats: latestStats
+          ? {
+              views: latestStats.views,
+              likes: latestStats.likes,
+              comments: latestStats.comments,
+              shares: latestStats.shares,
+            }
+          : null,
+      };
+    });
+
+    return {
+      assignedAccounts,
       totals: {
         views: totalViews,
         likes: totalLikes,

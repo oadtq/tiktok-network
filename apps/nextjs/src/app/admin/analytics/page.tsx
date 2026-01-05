@@ -1,21 +1,19 @@
 import { redirect } from "next/navigation";
 
 import { getSession } from "~/auth/server";
+import { AdminAnalyticsContent } from "../_components/admin-analytics-content";
 
-import { SubmissionsContent } from "./_components/submissions-content";
-
-export default async function SubmissionsPage() {
+export default async function AdminAnalyticsPage() {
   const session = await getSession();
 
   if (!session) {
     redirect("/auth/signin");
   }
 
-  // Check if user is admin
   const userRole = (session.user as { role?: string }).role ?? "creator";
   if (userRole !== "admin") {
     redirect("/dashboard");
   }
 
-  return <SubmissionsContent user={session.user} />;
+  return <AdminAnalyticsContent user={session.user} />;
 }

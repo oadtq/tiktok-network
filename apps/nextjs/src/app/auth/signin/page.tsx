@@ -23,13 +23,19 @@ export default function SignInPage() {
     setError(null);
 
     try {
-      const endpoint = mode === "signin" 
-        ? "/api/auth/sign-in/email" 
-        : "/api/auth/sign-up/email";
-      
-      const body = mode === "signin"
-        ? { email: formData.email, password: formData.password }
-        : { email: formData.email, password: formData.password, name: formData.name };
+      const endpoint =
+        mode === "signin"
+          ? "/api/auth/sign-in/email"
+          : "/api/auth/sign-up/email";
+
+      const body =
+        mode === "signin"
+          ? { email: formData.email, password: formData.password }
+          : {
+              email: formData.email,
+              password: formData.password,
+              name: formData.name,
+            };
 
       const res = await fetch(endpoint, {
         method: "POST",
@@ -160,7 +166,6 @@ export default function SignInPage() {
             </p>
           )}
         </div>
-
       </div>
     </main>
   );
