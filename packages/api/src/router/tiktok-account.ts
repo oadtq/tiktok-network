@@ -6,13 +6,14 @@
 import type { TRPCRouterRecord } from "@trpc/server";
 import { z } from "zod/v4";
 
-import { desc, eq } from "@everylab/db";
+import { and, desc, eq } from "@everylab/db";
 import {
   clip,
   clipStats,
   CreateTiktokAccountSchema,
   tiktokAccount,
   UpdateTiktokAccountSchema,
+  userTiktokAccount,
 } from "@everylab/db/schema";
 
 import { adminProcedure, protectedProcedure } from "../trpc";
@@ -252,5 +253,82 @@ export const tiktokAccountRouter = {
         })),
         total: totalCount.length,
       };
+    }),
+
+  /**
+   * Get linked users for a TikTok account
+   */
+  getLinkedUsers: adminProcedure
+    .input(z.object({ id: z.string().uuid() }))
+    .query(async ({ ctx, input }) => {
+      const linkedUsers = await ctx.db.query.userTiktokAccount.findMany({
+        where: eq(userTiktokAccount.tiktokAccountId, input.id),
+        with: {
+          user: {
+            columns: {
+              id: true,
+              name: true,
+              email: true,
+              image: true,
+            },
+          },
+        },
+      });
+
+      return linkedUsers.map((u) => u.user);
+    }),
+
+  /**
+   * Link a user to a TikTok account
+   */
+  linkUser: adminProcedure
+    .input(
+      z.object({
+        tiktokAccountId: z.string().uuid(),
+        userId: z.string(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      // Check if already linked
+      const existing = await ctx.db.query.userTiktokAccount.findFirst({
+        where: and(
+          eq(userTiktokAccount.tiktokAccountId, input.tiktokAccountId),
+          eq(userTiktokAccount.userId, input.userId)
+        ),
+      });
+
+      if (existing) {
+        throw new Error("User is already linked to this account");
+      }
+
+      await ctx.db.insert(userTiktokAccount).values({
+        tiktokAccountId: input.tiktokAccountId,
+        userId: input.userId,
+      });
+
+      return { success: true };
+    }),
+
+  /**
+   * Unlink a user from a TikTok account
+   */
+  unlinkUser: adminProcedure
+    .input(
+      z.object({
+        tiktokAccountId: z.string().uuid(),
+        userId: z.string(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      await ctx.db
+        .delete(userTiktokAccount)
+        .where(
+          and(
+            eq(userTiktokAccount.tiktokAccountId, input.tiktokAccountId),
+            eq(userTiktokAccount.userId, input.userId)
+          )
+        );
+
+      return { success: true };
     }),
 } satisfies TRPCRouterRecord;

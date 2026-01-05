@@ -7,7 +7,7 @@ import type { TRPCRouterRecord } from "@trpc/server";
 import { z } from "zod/v4";
 
 import { eq } from "@everylab/db";
-import { tiktokAccount } from "@everylab/db/schema";
+import { clip, clipStats, tiktokAccount } from "@everylab/db/schema";
 import {
   createTikTokClient,
   isTikTokConfigured,
@@ -308,6 +308,77 @@ export const tiktokOAuthRouter = {
         .returning();
 
       console.log("[TikTok OAuth] Account info synced:", account.id);
+
+      // Sync videos
+      try {
+        console.log("[TikTok OAuth] Syncing videos for account:", account.id);
+        const videoData = await client.getVideoList(account.accessToken);
+        
+        console.log(`[TikTok OAuth] Found ${videoData.videos.length} videos`);
+
+        for (const video of videoData.videos) {
+          // Check if clip exists
+          const existingClip = await ctx.db.query.clip.findFirst({
+            where: eq(clip.tiktokVideoId, video.id),
+          });
+
+          let clipId = existingClip?.id;
+
+          if (existingClip) {
+            // Update existing clip
+            await ctx.db
+              .update(clip)
+              .set({
+                title: video.title || video.video_description || "Untitled TikTok",
+                description: video.video_description,
+                thumbnailUrl: video.cover_image_url,
+                tiktokVideoUrl: video.share_url,
+                publishedAt: new Date(video.create_time * 1000),
+                status: "published",
+                updatedAt: new Date(),
+              })
+              .where(eq(clip.id, existingClip.id));
+          } else {
+            // Create new clip
+            // Note: Assigning to the current user (admin) as owner for now
+            // since we don't know which creator this belongs to
+            const [newClip] = await ctx.db
+              .insert(clip)
+              .values({
+                userId: ctx.session.user.id,
+                tiktokAccountId: account.id,
+                title: video.title || video.video_description || "Untitled TikTok",
+                description: video.video_description,
+                videoUrl: video.share_url || "", // We don't have the raw video URL, using share URL as placeholder
+                thumbnailUrl: video.cover_image_url,
+                tiktokVideoId: video.id,
+                tiktokVideoUrl: video.share_url,
+                durationSeconds: video.duration,
+                publishedAt: new Date(video.create_time * 1000),
+                status: "published",
+              })
+              .returning();
+            
+            clipId = newClip?.id;
+          }
+
+          if (clipId) {
+            // Add stats
+            await ctx.db.insert(clipStats).values({
+              clipId,
+              views: video.view_count ?? 0,
+              likes: video.like_count ?? 0,
+              comments: video.comment_count ?? 0,
+              shares: video.share_count ?? 0,
+            });
+          }
+        }
+        
+        console.log("[TikTok OAuth] Videos synced successfully");
+      } catch (error) {
+        console.error("[TikTok OAuth] Failed to sync videos:", error);
+        // Don't fail the whole request if video sync fails
+      }
 
       return updatedAccount;
     }),

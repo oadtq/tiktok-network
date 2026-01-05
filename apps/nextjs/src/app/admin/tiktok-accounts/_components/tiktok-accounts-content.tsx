@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, Fragment } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -18,10 +18,13 @@ import {
   Video,
   ChevronDown,
   ChevronUp,
+  ChevronRight,
   Heart,
   MessageCircle,
   Share2,
   Play,
+  UserPlus,
+  Users,
   X,
 } from "lucide-react";
 
@@ -68,6 +71,15 @@ export function TikTokAccountsContent({ user }: TikTokAccountsContentProps) {
   const [detailsAccountId, setDetailsAccountId] = useState<string | null>(null);
   const [clipsPage, setClipsPage] = useState(0);
   const [expandedClipId, setExpandedClipId] = useState<string | null>(null);
+  const [selectedUserToLink, setSelectedUserToLink] = useState<string>("");
+
+  // Confirmation states
+  const [confirmAction, setConfirmAction] = useState<{
+    type: "disconnect" | "delete";
+    accountId: string;
+    accountName: string;
+  } | null>(null);
+  const [confirmInput, setConfirmInput] = useState("");
 
   // Check if TikTok OAuth is configured
   const { data: oauthConfig } = useQuery(
@@ -102,6 +114,15 @@ export function TikTokAccountsContent({ user }: TikTokAccountsContentProps) {
       { enabled: !!detailsAccountId }
     )
   );
+
+  const { data: linkedUsers, refetch: refetchLinkedUsers } = useQuery(
+    trpc.tiktokAccount.getLinkedUsers.queryOptions(
+      { id: detailsAccountId ?? "" },
+      { enabled: !!detailsAccountId }
+    )
+  );
+
+  const { data: allUsers } = useQuery(trpc.admin.users.queryOptions());
 
   // OAuth mutations
   const getAuthUrl = useMutation(
@@ -181,6 +202,25 @@ export function TikTokAccountsContent({ user }: TikTokAccountsContentProps) {
         void queryClient.invalidateQueries({ queryKey: trpc.cloudPhone.list.queryKey() });
         setIsAssignModalOpen(false);
         setSelectedAccountId(null);
+      },
+    })
+  );
+
+  const linkUserMutation = useMutation(
+    trpc.tiktokAccount.linkUser.mutationOptions({
+      onSuccess: () => {
+        void refetchLinkedUsers();
+        void queryClient.invalidateQueries({ queryKey: trpc.tiktokAccount.list.queryKey() });
+        setSelectedUserToLink("");
+      },
+    })
+  );
+
+  const unlinkUserMutation = useMutation(
+    trpc.tiktokAccount.unlinkUser.mutationOptions({
+      onSuccess: () => {
+        void refetchLinkedUsers();
+        void queryClient.invalidateQueries({ queryKey: trpc.tiktokAccount.list.queryKey() });
       },
     })
   );
@@ -291,6 +331,18 @@ export function TikTokAccountsContent({ user }: TikTokAccountsContentProps) {
         cloudPhoneId,
       });
     }
+  };
+
+  const handleConfirm = () => {
+    if (!confirmAction) return;
+
+    if (confirmAction.type === "disconnect") {
+      disconnectAccount.mutate({ accountId: confirmAction.accountId });
+    } else if (confirmAction.type === "delete") {
+      deleteMutation.mutate({ id: confirmAction.accountId });
+    }
+    setConfirmAction(null);
+    setConfirmInput("");
   };
 
   // Get pending count for badge
@@ -491,7 +543,7 @@ export function TikTokAccountsContent({ user }: TikTokAccountsContentProps) {
                       accounts?.map((account) => (
                         <tr 
                           key={account.id} 
-                          className="group cursor-pointer transition-colors hover:bg-muted/30"
+                          className="group cursor-pointer transition-colors hover:bg-accent/50"
                           onClick={(e) => {
                             // Prevent opening details if clicking on actions or cloud phone buttons
                             if ((e.target as HTMLElement).closest("button") || (e.target as HTMLElement).closest("a")) return;
@@ -559,83 +611,96 @@ export function TikTokAccountsContent({ user }: TikTokAccountsContentProps) {
                             )}
                           </td>
                           <td className="px-6 py-4">
-                            <div className="flex flex-wrap gap-1">
-                              {account.userTiktokAccounts.length > 0 ? (
-                                account.userTiktokAccounts.map((uta: { user: { id: string; name: string } }) => (
-                                  <span
-                                    key={uta.user.id}
-                                    className="rounded-full bg-blue-50 px-2 py-0.5 text-xs text-blue-600"
-                                  >
-                                    {uta.user.name}
-                                  </span>
-                                ))
-                              ) : (
-                                <span className="text-sm text-muted-foreground">
-                                  No users
-                                </span>
-                              )}
+                            <div className="flex items-center gap-2">
+                              <Users className="size-4 text-muted-foreground" />
+                              <span className="text-sm text-foreground">
+                                {account.userTiktokAccounts.length} {account.userTiktokAccounts.length === 1 ? "user" : "users"}
+                              </span>
                             </div>
                           </td>
                           <td className="px-6 py-4">
-                            <div className="flex items-center justify-end gap-2">
-                              {account.accessToken && (
+                            <div className="flex items-center justify-end gap-4">
+                              <div className="flex items-center justify-end gap-2">
+                                {account.accessToken && (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="gap-1"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      syncAccount.mutate({ accountId: account.id });
+                                    }}
+                                    disabled={syncAccount.isPending}
+                                  >
+                                    <RefreshCw
+                                      className={`size-3 ${syncAccount.isPending ? "animate-spin" : ""}`}
+                                    />
+                                    Sync
+                                  </Button>
+                                )}
+                                {!account.accessToken && (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleEditClick(account);
+                                    }}
+                                  >
+                                    <Edit className="size-4" />
+                                  </Button>
+                                )}
+                                {account.accessToken ? (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="gap-1 text-amber-600 hover:bg-amber-50 hover:text-amber-700"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setConfirmAction({
+                                        type: "disconnect",
+                                        accountId: account.id,
+                                        accountName: account.name
+                                      });
+                                    }}
+                                    disabled={disconnectAccount.isPending}
+                                  >
+                                    <X className="size-3" />
+                                    Disconnect
+                                  </Button>
+                                ) : oauthConfig?.configured ? (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="gap-1"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleConnectAccount();
+                                    }}
+                                  >
+                                    <ExternalLink className="size-3" />
+                                    Connect
+                                  </Button>
+                                ) : null}
                                 <Button
                                   variant="ghost"
                                   size="sm"
-                                  className="gap-1"
-                                  onClick={() => syncAccount.mutate({ accountId: account.id })}
-                                  disabled={syncAccount.isPending}
+                                  className="gap-1 text-red-600 hover:bg-red-50 hover:text-red-700"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setConfirmAction({
+                                      type: "delete",
+                                      accountId: account.id,
+                                      accountName: account.name
+                                    });
+                                    setConfirmInput("");
+                                  }}
+                                  disabled={deleteMutation.isPending}
                                 >
-                                  <RefreshCw
-                                    className={`size-3 ${syncAccount.isPending ? "animate-spin" : ""}`}
-                                  />
-                                  Sync
+                                  <Trash2 className="size-3" />
                                 </Button>
-                              )}
-                              {!account.accessToken && (
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => handleEditClick(account)}
-                                >
-                                  <Edit className="size-4" />
-                                </Button>
-                              )}
-                              {account.accessToken ? (
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="gap-1 text-amber-600 hover:bg-amber-50 hover:text-amber-700"
-                                  onClick={() => disconnectAccount.mutate({ accountId: account.id })}
-                                  disabled={disconnectAccount.isPending}
-                                >
-                                  <X className="size-3" />
-                                  Disconnect
-                                </Button>
-                              ) : oauthConfig?.configured ? (
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="gap-1"
-                                  onClick={handleConnectAccount}
-                                >
-                                  <ExternalLink className="size-3" />
-                                  Connect
-                                </Button>
-                              ) : null}
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="gap-1 text-red-600 hover:bg-red-50 hover:text-red-700"
-                                onClick={() => {
-                                  if (confirm("Are you sure you want to delete this account?")) {
-                                    deleteMutation.mutate({ id: account.id });
-                                  }
-                                }}
-                                disabled={deleteMutation.isPending}
-                              >
-                                <Trash2 className="size-3" />
-                              </Button>
+                              </div>
+                              <ChevronRight className="size-5 text-muted-foreground/30 transition-colors group-hover:text-muted-foreground" />
                             </div>
                           </td>
                         </tr>
@@ -840,6 +905,96 @@ export function TikTokAccountsContent({ user }: TikTokAccountsContentProps) {
                   </div>
                 </div>
 
+                {/* Linked Users Section */}
+                <div className="mb-8 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-semibold flex items-center gap-2">
+                      <Users className="size-4" />
+                      Linked Users
+                    </h3>
+                  </div>
+                  
+                  <div className="rounded-lg border border-border bg-card p-4">
+                    <div className="flex items-end gap-3 mb-4">
+                      <div className="flex-1">
+                        <Label htmlFor="link-user" className="text-xs text-muted-foreground">Add User</Label>
+                        <select
+                          id="link-user"
+                          className="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                          value={selectedUserToLink}
+                          onChange={(e) => setSelectedUserToLink(e.target.value)}
+                        >
+                          <option value="">Select a user...</option>
+                          {allUsers
+                            ?.filter(u => !linkedUsers?.some(lu => lu.id === u.id))
+                            .map((user) => (
+                              <option key={user.id} value={user.id}>
+                                {user.name} ({user.email})
+                              </option>
+                            ))}
+                        </select>
+                      </div>
+                      <Button 
+                        size="sm"
+                        disabled={!selectedUserToLink || linkUserMutation.isPending}
+                        onClick={() => {
+                          if (detailsAccountId && selectedUserToLink) {
+                            linkUserMutation.mutate({
+                              tiktokAccountId: detailsAccountId,
+                              userId: selectedUserToLink
+                            });
+                          }
+                        }}
+                      >
+                        {linkUserMutation.isPending ? (
+                          <RefreshCw className="size-4 animate-spin" />
+                        ) : (
+                          <UserPlus className="size-4" />
+                        )}
+                        <span className="ml-2">Link</span>
+                      </Button>
+                    </div>
+
+                    <div className="space-y-2">
+                      {linkedUsers?.length === 0 ? (
+                        <p className="text-sm text-muted-foreground text-center py-2">
+                          No users linked to this account
+                        </p>
+                      ) : (
+                        linkedUsers?.map((user) => (
+                          <div key={user.id} className="flex items-center justify-between rounded-md border border-border bg-muted/30 p-2">
+                            <div className="flex items-center gap-3">
+                              <div className="flex size-8 items-center justify-center rounded-full bg-primary/10 text-xs font-medium text-primary">
+                                {user.name.charAt(0).toUpperCase()}
+                              </div>
+                              <div>
+                                <p className="text-sm font-medium">{user.name}</p>
+                                <p className="text-xs text-muted-foreground">{user.email}</p>
+                              </div>
+                            </div>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 w-8 p-0 text-muted-foreground hover:text-red-600"
+                              onClick={() => {
+                                if (detailsAccountId) {
+                                  unlinkUserMutation.mutate({
+                                    tiktokAccountId: detailsAccountId,
+                                    userId: user.id
+                                  });
+                                }
+                              }}
+                              disabled={unlinkUserMutation.isPending}
+                            >
+                              <X className="size-4" />
+                            </Button>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                </div>
+
                 {/* Clips Table */}
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
@@ -888,9 +1043,8 @@ export function TikTokAccountsContent({ user }: TikTokAccountsContentProps) {
                         </thead>
                         <tbody className="divide-y divide-border">
                           {accountClipsData.clips.map((clip) => (
-                            <>
+                            <Fragment key={clip.id}>
                               <tr 
-                                key={clip.id} 
                                 className="cursor-pointer hover:bg-muted/30"
                                 onClick={() => setExpandedClipId(expandedClipId === clip.id ? null : clip.id)}
                               >
@@ -954,7 +1108,7 @@ export function TikTokAccountsContent({ user }: TikTokAccountsContentProps) {
                                   </td>
                                 </tr>
                               )}
-                            </>
+                            </Fragment>
                           ))}
                         </tbody>
                       </table>
@@ -965,6 +1119,66 @@ export function TikTokAccountsContent({ user }: TikTokAccountsContentProps) {
             </div>
           </div>
         </>
+      )}
+
+      {/* Confirmation Modal */}
+      {confirmAction && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-xl bg-card p-6 shadow-xl border border-border">
+            <div className="mb-4 flex items-center gap-3 text-amber-600">
+              <div className={`flex size-10 items-center justify-center rounded-full ${confirmAction.type === 'delete' ? 'bg-red-50 text-red-600' : 'bg-amber-50 text-amber-600'}`}>
+                {confirmAction.type === 'delete' ? <Trash2 className="size-5" /> : <AlertCircle className="size-5" />}
+              </div>
+              <h2 className="text-lg font-semibold text-foreground">
+                {confirmAction.type === "delete" ? "Delete Account" : "Disconnect Account"}
+              </h2>
+            </div>
+            
+            <div className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                {confirmAction.type === "delete" 
+                  ? `Are you sure you want to permanently delete "${confirmAction.accountName}"? This action cannot be undone and will remove all associations.`
+                  : `Are you sure you want to disconnect "${confirmAction.accountName}"? The account will remain in the system but API access will be revoked.`}
+              </p>
+
+              {confirmAction.type === "delete" && (
+                <div className="space-y-2">
+                  <Label htmlFor="confirm-input" className="text-xs uppercase tracking-wider text-muted-foreground">
+                    Type <span className="font-bold text-foreground select-none">{confirmAction.accountName}</span> to confirm
+                  </Label>
+                  <Input
+                    id="confirm-input"
+                    value={confirmInput}
+                    onChange={(e) => setConfirmInput(e.target.value)}
+                    placeholder="Enter account name"
+                    className="mt-1"
+                    autoFocus
+                  />
+                </div>
+              )}
+
+              <div className="flex justify-end gap-3 pt-2">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setConfirmAction(null);
+                    setConfirmInput("");
+                  }}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  variant={confirmAction.type === "delete" ? "destructive" : "default"}
+                  onClick={handleConfirm}
+                  disabled={confirmAction.type === "delete" && confirmInput !== confirmAction.accountName}
+                  className={confirmAction.type === "disconnect" ? "bg-amber-600 hover:bg-amber-700 text-white" : ""}
+                >
+                  {confirmAction.type === "delete" ? "Delete Permanently" : "Confirm Disconnect"}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
