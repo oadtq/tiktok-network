@@ -1,0 +1,8 @@
+{
+  "extends": "@everylab/tsconfig/compiled-package.json",
+  "compilerOptions": {
+    "lib": ["ES2022", "DOM"]
+  },
+  "include": ["*.ts", "src"],
+  "exclude": ["node_modules"]
+}

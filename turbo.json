@@ -57,7 +57,9 @@
     "AWS_SECRET_ACCESS_KEY",
     "AWS_S3_BUCKET",
     "AWS_REGION",
-    "S3_PUBLIC_URL"
+    "S3_PUBLIC_URL",
+    "TIKTOK_CLIENT_KEY",
+    "TIKTOK_CLIENT_SECRET"
   ],
   "globalPassThroughEnv": [
     "NODE_ENV",

@@ -6,23 +6,17 @@ import { useRouter } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowLeft,
-  BarChart3,
   Check,
-  Clock,
   FileVideo,
-  Home,
-  LayoutDashboard,
-  LogOut,
-  Settings,
-  Upload,
   Video,
   X,
 } from "lucide-react";
 
 import { Button } from "@everylab/ui/button";
 
-import { authClient } from "~/auth/client";
 import { useTRPC } from "~/trpc/react";
+import { Sidebar } from "~/components/sidebar";
+import { creatorNavItems } from "~/config/navigation";
 
 interface User {
   id: string;
@@ -43,33 +37,6 @@ interface UploadState {
   description: string;
   tiktokAccountId: string;
   scheduledAt: string;
-}
-
-// Navigation Item Component
-function NavItem({
-  icon: Icon,
-  label,
-  active = false,
-  href = "#",
-}: {
-  icon: React.ElementType;
-  label: string;
-  active?: boolean;
-  href?: string;
-}) {
-  return (
-    <Link
-      href={href}
-      className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
-        active
-          ? "bg-primary text-primary-foreground"
-          : "text-muted-foreground hover:bg-accent hover:text-foreground"
-      }`}
-    >
-      <Icon className="size-5" />
-      {label}
-    </Link>
-  );
 }
 
 export function UploadContent({ user }: UploadContentProps) {
@@ -169,8 +136,12 @@ export function UploadContent({ user }: UploadContentProps) {
         };
         xhr.onerror = () => reject(new Error("Upload failed"));
         xhr.open("PUT", uploadUrl);
-        xhr.setRequestHeader("Content-Type", uploadState.file!.type || "video/mp4");
-        xhr.send(uploadState.file);
+        if (uploadState.file) {
+          xhr.setRequestHeader("Content-Type", uploadState.file.type || "video/mp4");
+          xhr.send(uploadState.file);
+        } else {
+          reject(new Error("No file selected"));
+        }
       });
 
       setUploadState((prev) => ({ ...prev, videoUrl: publicUrl }));
@@ -192,7 +163,6 @@ export function UploadContent({ user }: UploadContentProps) {
         title: uploadState.title,
         description: uploadState.description || undefined,
         videoUrl: uploadState.videoUrl,
-        tiktokAccountId: uploadState.tiktokAccountId || undefined,
         scheduledAt: uploadState.scheduledAt ? new Date(uploadState.scheduledAt) : undefined,
       });
 
@@ -214,51 +184,19 @@ export function UploadContent({ user }: UploadContentProps) {
 
   return (
     <div className="flex min-h-screen bg-background">
-      {/* Sidebar */}
-      <aside className="sticky top-0 flex h-screen w-64 shrink-0 flex-col border-r border-border bg-sidebar">
-        {/* Logo */}
-        <div className="flex h-16 items-center gap-3 border-b border-border px-6">
-          <div className="flex size-8 items-center justify-center rounded-lg bg-primary">
-            <LayoutDashboard className="size-4 text-primary-foreground" />
-          </div>
-          <span className="text-lg font-semibold tracking-tight">Creator</span>
-        </div>
-
-        {/* Navigation */}
-        <nav className="flex-1 space-y-1 p-4">
-          <NavItem icon={Home} label="Dashboard" href="/dashboard" />
-          <NavItem icon={Upload} label="Upload" active href="/dashboard/upload" />
-          <NavItem icon={Video} label="My Clips" href="/dashboard/clips" />
-          <NavItem icon={Clock} label="Scheduled" href="/dashboard/scheduled" />
-          <NavItem icon={BarChart3} label="Analytics" href="/dashboard/analytics" />
-          <NavItem icon={Settings} label="Settings" href="/dashboard/settings" />
-        </nav>
-
-        {/* User Profile */}
-        <div className="border-t border-border p-4">
-          <div className="flex items-center gap-3">
-            <div className="flex size-9 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-purple-600 text-sm font-medium text-white">
-              {user.name.charAt(0).toUpperCase()}
-            </div>
-            <div className="flex-1 overflow-hidden">
-              <p className="truncate text-sm font-medium text-foreground">
-                {user.name}
-              </p>
-              <p className="truncate text-xs text-muted-foreground">Creator</p>
-            </div>
-            <button
-              onClick={async () => {
-                await authClient.signOut();
-                window.location.href = "/";
-              }}
-              className="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-              title="Sign out"
-            >
-              <LogOut className="size-4" />
-            </button>
-          </div>
-        </div>
-      </aside>
+      <Sidebar
+        user={user}
+        title="Creator"
+        logoIcon={Video}
+        items={creatorNavItems}
+        bottomContent={
+          <>
+            <p className="mb-2 px-3 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+              Support
+            </p>
+          </>
+        }
+      />
 
       {/* Main Content */}
       <main className="flex-1 overflow-auto">

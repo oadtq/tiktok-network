@@ -11,8 +11,8 @@ import { tiktokAccount } from "@everylab/db/schema";
 import {
   GeeLarkClient,
   geelarkEnv,
-  type CloudPhone,
 } from "@everylab/geelark";
+import type { CloudPhone } from "@everylab/geelark";
 
 import { adminProcedure } from "../trpc";
 
@@ -68,8 +68,8 @@ export const cloudPhoneRouter = {
       // Create a map of envId -> account for fast lookup
       const accountsByEnvId = new Map(
         accounts
-          .filter((a) => a.geelarkEnvId)
-          .map((a) => [a.geelarkEnvId!, a])
+          .filter((a): a is typeof a & { geelarkEnvId: string } => !!a.geelarkEnvId)
+          .map((a) => [a.geelarkEnvId, a])
       );
 
       // Enrich cloud phones with linked account info

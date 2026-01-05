@@ -1,12 +1,9 @@
 {
-  "name": "@everylab/api",
+  "name": "@everylab/tiktok",
   "private": true,
   "type": "module",
   "exports": {
-    ".": {
-      "types": "./dist/index.d.ts",
-      "default": "./src/index.ts"
-    }
+    ".": "./src/index.ts"
   },
   "license": "MIT",
   "scripts": {
@@ -14,24 +11,17 @@
     "clean": "git clean -xdf .cache .turbo dist node_modules",
     "dev": "tsc",
     "format": "prettier --check . --ignore-path ../../.gitignore",
-    "lint": "eslint --flag unstable_native_nodejs_ts_config",
+    "lint": "eslint",
     "typecheck": "tsc --noEmit --emitDeclarationOnly false"
   },
   "dependencies": {
-    "@everylab/auth": "workspace:*",
-    "@everylab/db": "workspace:*",
-    "@everylab/geelark": "workspace:*",
-    "@everylab/storage": "workspace:*",
-    "@everylab/tiktok": "workspace:*",
-    "@everylab/validators": "workspace:*",
-    "@trpc/server": "catalog:",
-    "superjson": "2.2.3",
     "zod": "catalog:"
   },
   "devDependencies": {
     "@everylab/eslint-config": "workspace:*",
     "@everylab/prettier-config": "workspace:*",
     "@everylab/tsconfig": "workspace:*",
+    "@types/node": "catalog:",
     "eslint": "catalog:",
     "prettier": "catalog:",
     "typescript": "catalog:"

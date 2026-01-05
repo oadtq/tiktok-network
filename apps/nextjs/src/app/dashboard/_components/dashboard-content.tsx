@@ -1,14 +1,11 @@
 "use client";
 
 import { useState, useRef } from "react";
-import Link from "next/link";
+
 import {
-  BarChart3,
   Calendar,
   Check,
   Clock,
-  Home,
-  LogOut,
   Upload,
   Video,
   X,
@@ -17,8 +14,9 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { Button } from "@everylab/ui/button";
 
-import { authClient } from "~/auth/client";
 import { useTRPC } from "~/trpc/react";
+import { Sidebar } from "~/components/sidebar";
+import { creatorNavItems } from "~/config/navigation";
 
 interface User {
   id: string;
@@ -39,33 +37,6 @@ const statusConfig = {
   published: { color: "bg-emerald-50 text-emerald-600", label: "Published" },
   failed: { color: "bg-red-50 text-red-700", label: "Failed" },
 };
-
-// Navigation Item Component
-function NavItem({
-  icon: Icon,
-  label,
-  active = false,
-  href = "#",
-}: {
-  icon: React.ElementType;
-  label: string;
-  active?: boolean;
-  href?: string;
-}) {
-  return (
-    <Link
-      href={href}
-      className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
-        active
-          ? "bg-primary text-primary-foreground"
-          : "text-muted-foreground hover:bg-accent hover:text-foreground"
-      }`}
-    >
-      <Icon className="size-5" />
-      {label}
-    </Link>
-  );
-}
 
 // Upload Tab Content
 function UploadTab() {
@@ -361,56 +332,19 @@ function UploadTab() {
 export function DashboardContent({ user }: DashboardContentProps) {
   return (
     <div className="flex min-h-screen bg-background">
-      {/* Sidebar */}
-      <aside className="sticky top-0 flex h-screen w-64 shrink-0 flex-col border-r border-border bg-sidebar">
-        {/* Logo */}
-        <div className="flex h-16 items-center gap-3 border-b border-border px-6">
-          <div className="flex size-8 items-center justify-center rounded-lg bg-primary">
-            <Video className="size-4 text-primary-foreground" />
-          </div>
-          <span className="text-lg font-semibold tracking-tight">Creator</span>
-        </div>
-
-        {/* Navigation */}
-        <nav className="flex-1 space-y-1 p-4">
-          <NavItem icon={Home} label="Dashboard" active href="/dashboard" />
-          <NavItem icon={BarChart3} label="Statistics" href="/dashboard/statistics" />
-
-          <div className="my-4 border-t border-border" />
-
-          <p className="mb-2 px-3 text-xs font-medium uppercase tracking-wider text-muted-foreground">
-            Support
-          </p>
-        </nav>
-
-        {/* User Profile */}
-        <div className="border-t border-border p-4">
-          <div className="flex items-center gap-3">
-            <div className="flex size-9 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-purple-600 text-sm font-medium text-white">
-              {user.name.charAt(0).toUpperCase()}
-            </div>
-            <div className="flex-1 overflow-hidden">
-              <p className="truncate text-sm font-medium text-foreground">
-                {user.name}
-              </p>
-              <p className="truncate text-xs text-muted-foreground">
-                {user.email}
-              </p>
-            </div>
-            <button
-              onClick={() => {
-                void authClient.signOut().then(() => {
-                  window.location.href = "/";
-                });
-              }}
-              className="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-              title="Sign out"
-            >
-              <LogOut className="size-4" />
-            </button>
-          </div>
-        </div>
-      </aside>
+      <Sidebar
+        user={user}
+        title="Creator"
+        logoIcon={Video}
+        items={creatorNavItems}
+        bottomContent={
+          <>
+            <p className="mb-2 px-3 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+              Support
+            </p>
+          </>
+        }
+      />
 
       {/* Main Content */}
       <main className="flex-1 overflow-auto">

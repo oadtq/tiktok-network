@@ -16,16 +16,6 @@ import { createStorageFromEnv } from "@everylab/storage";
 
 import { protectedProcedure } from "../trpc";
 
-// Mock stats generator for PoC
-function generateMockStats() {
-  return {
-    views: Math.floor(Math.random() * 100000) + 1000,
-    likes: Math.floor(Math.random() * 10000) + 100,
-    comments: Math.floor(Math.random() * 1000) + 10,
-    shares: Math.floor(Math.random() * 500) + 5,
-  };
-}
-
 // Get video content type from filename
 function getVideoContentType(filename: string): string {
   const ext = filename.split(".").pop()?.toLowerCase();
@@ -255,7 +245,7 @@ export const clipRouter = {
     }),
 
   /**
-   * Get stats for a clip (mock data for PoC)
+   * Get stats for a clip (from database, synced via TikTok API)
    */
   getStats: protectedProcedure
     .input(z.object({ clipId: z.string().uuid() }))
@@ -269,33 +259,20 @@ export const clipRouter = {
         throw new Error("Clip not found or access denied");
       }
 
-      // Get existing stats
+      // Get existing stats from database
       const stats = await ctx.db.query.clipStats.findMany({
         where: eq(clipStats.clipId, input.clipId),
         orderBy: desc(clipStats.recordedAt),
         limit: 30,
       });
 
-      // If no stats exist, generate mock data for PoC
-      if (stats.length === 0) {
-        const mockStats = generateMockStats();
-        // Insert mock stats
-        const [newStats] = await ctx.db
-          .insert(clipStats)
-          .values({
-            clipId: input.clipId,
-            ...mockStats,
-          })
-          .returning();
-
-        return [newStats];
-      }
-
+      // Return stats (may be empty if not yet synced from TikTok)
       return stats;
     }),
 
   /**
-   * Refresh stats from TikTok API (mock for PoC)
+   * Note: Stats refresh is now handled by tiktokStats.syncClipStats
+   * This endpoint just returns current stats from database
    */
   refreshStats: protectedProcedure
     .input(z.object({ clipId: z.string().uuid() }))
@@ -309,17 +286,14 @@ export const clipRouter = {
         throw new Error("Clip not found or access denied");
       }
 
-      // In PoC, generate mock stats
-      const mockStats = generateMockStats();
+      // Return latest stats from database
+      // Note: To get fresh stats from TikTok, use tiktokStats.syncClipStats
+      const stats = await ctx.db.query.clipStats.findMany({
+        where: eq(clipStats.clipId, input.clipId),
+        orderBy: desc(clipStats.recordedAt),
+        limit: 1,
+      });
 
-      const [newStats] = await ctx.db
-        .insert(clipStats)
-        .values({
-          clipId: input.clipId,
-          ...mockStats,
-        })
-        .returning();
-
-      return newStats;
+      return stats[0] ?? null;
     }),
 } satisfies TRPCRouterRecord;

@@ -3,15 +3,12 @@
 import { useState } from "react";
 import Link from "next/link";
 import {
-  BarChart3,
   Bookmark,
   ChevronDown,
   Clock,
   Eye,
   Heart,
-  Home,
   LayoutDashboard,
-  LogOut,
   MessageCircle,
   Video,
 } from "lucide-react";
@@ -19,8 +16,10 @@ import { useQuery } from "@tanstack/react-query";
 
 import { Button } from "@everylab/ui/button";
 
-import { authClient } from "~/auth/client";
 import { useTRPC } from "~/trpc/react";
+import { Sidebar } from "~/components/sidebar";
+import type { NavItem } from "~/components/sidebar";
+import { adminNavItems } from "~/config/navigation";
 
 interface User {
   id: string;
@@ -52,47 +51,7 @@ function getStatusLabel(status: ClipStatus): string {
   return statusConfig[status].label;
 }
 
-// Navigation Item Component
-function NavItem({
-  icon: Icon,
-  label,
-  active = false,
-  href = "#",
-  badge,
-}: {
-  icon: React.ElementType;
-  label: string;
-  active?: boolean;
-  href?: string;
-  badge?: number;
-}) {
-  return (
-    <Link
-      href={href}
-      className={`flex items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
-        active
-          ? "bg-primary text-primary-foreground"
-          : "text-muted-foreground hover:bg-accent hover:text-foreground"
-      }`}
-    >
-      <div className="flex items-center gap-3">
-        <Icon className="size-5" />
-        {label}
-      </div>
-      {badge !== undefined && badge > 0 && (
-        <span
-          className={`flex size-5 items-center justify-center rounded-full text-xs font-medium ${
-            active
-              ? "bg-primary-foreground/20 text-primary-foreground"
-              : "bg-amber-100 text-amber-700"
-          }`}
-        >
-          {badge}
-        </span>
-      )}
-    </Link>
-  );
-}
+
 
 // Stat Card Component
 function StatCard({
@@ -227,63 +186,36 @@ export function AdminStatisticsContent({ user }: AdminStatisticsContentProps) {
     setCurrentPage(0);
   };
 
+  // Add badge to Dashboard item
+  const navItems: NavItem[] = adminNavItems.map((item) => {
+    if (item.label === "Dashboard") {
+      return { ...item, badge: pendingClips.length };
+    }
+    return item;
+  });
+
   return (
     <div className="flex min-h-screen bg-background">
-      {/* Sidebar */}
-      <aside className="sticky top-0 flex h-screen w-64 shrink-0 flex-col border-r border-border bg-sidebar">
-        {/* Logo */}
-        <div className="flex h-16 items-center gap-3 border-b border-border px-6">
-          <div className="flex size-8 items-center justify-center rounded-lg bg-primary">
-            <LayoutDashboard className="size-4 text-primary-foreground" />
-          </div>
-          <span className="text-lg font-semibold tracking-tight">Admin</span>
-        </div>
-
-        {/* Navigation */}
-        <nav className="flex-1 space-y-1 p-4">
-          <NavItem icon={Home} label="Dashboard" href="/admin" />
-          <NavItem
-            icon={Clock}
-            label="Pending Review"
-            href="/admin"
-            badge={pendingClips.length}
-          />
-          <NavItem icon={BarChart3} label="Statistics" active href="/admin/statistics" />
-
-          <div className="my-4 border-t border-border" />
-
-          <p className="mb-2 px-3 text-xs font-medium uppercase tracking-wider text-muted-foreground">
-            Switch View
-          </p>
-          <NavItem icon={Video} label="Creator Dashboard" href="/dashboard" />
-        </nav>
-
-        {/* User Profile */}
-        <div className="border-t border-border p-4">
-          <div className="flex items-center gap-3">
-            <div className="flex size-9 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 text-sm font-medium text-white">
-              {user.name.charAt(0).toUpperCase()}
-            </div>
-            <div className="flex-1 overflow-hidden">
-              <p className="truncate text-sm font-medium text-foreground">
-                {user.name}
-              </p>
-              <p className="truncate text-xs text-muted-foreground">Admin</p>
-            </div>
-            <button
-              onClick={() => {
-                void authClient.signOut().then(() => {
-                  window.location.href = "/";
-                });
-              }}
-              className="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-              title="Sign out"
+      <Sidebar
+        user={{ ...user, role: "admin" }}
+        title="Admin"
+        logoIcon={LayoutDashboard}
+        items={navItems}
+        bottomContent={
+          <>
+            <p className="mb-2 px-3 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+              Switch View
+            </p>
+            <Link
+              href="/dashboard"
+              className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
             >
-              <LogOut className="size-4" />
-            </button>
-          </div>
-        </div>
-      </aside>
+              <Video className="size-5" />
+              Creator Dashboard
+            </Link>
+          </>
+        }
+      />
 
       {/* Main Content */}
       <main className="flex-1 overflow-auto">
