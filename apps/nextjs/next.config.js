@@ -18,6 +18,16 @@ const config = {
 
   /** We already do linting and typechecking as separate tasks in CI */
   typescript: { ignoreBuildErrors: true },
+
+  allowedDevOrigins: process.env.AUTH_TRUSTED_ORIGINS?.split(",")
+    .map((origin) => {
+      try {
+        return new URL(origin).hostname;
+      } catch {
+        return origin;
+      }
+    })
+    .filter(Boolean),
 };
 
 export default config;

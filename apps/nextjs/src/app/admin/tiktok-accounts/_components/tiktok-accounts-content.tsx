@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -16,6 +16,12 @@ import {
   Smartphone,
   Trash2,
   Video,
+  ChevronDown,
+  ChevronUp,
+  Heart,
+  MessageCircle,
+  Share2,
+  Play,
   X,
 } from "lucide-react";
 
@@ -56,6 +62,13 @@ export function TikTokAccountsContent({ user }: TikTokAccountsContentProps) {
   const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null);
   const [formData, setFormData] = useState({ name: "", tiktokUsername: "" });
 
+  const processedCodeRef = useRef<string | null>(null);
+
+  // Details Side Panel states
+  const [detailsAccountId, setDetailsAccountId] = useState<string | null>(null);
+  const [clipsPage, setClipsPage] = useState(0);
+  const [expandedClipId, setExpandedClipId] = useState<string | null>(null);
+
   // Check if TikTok OAuth is configured
   const { data: oauthConfig } = useQuery(
     trpc.tiktokOAuth.isConfigured.queryOptions()
@@ -69,6 +82,25 @@ export function TikTokAccountsContent({ user }: TikTokAccountsContentProps) {
   // Get cloud phones for linking
   const { data: cloudPhones } = useQuery(
     trpc.cloudPhone.list.queryOptions()
+  );
+
+  // Get account details
+  const { data: accountStats } = useQuery(
+    trpc.tiktokAccount.getStats.queryOptions(
+      { id: detailsAccountId ?? "" },
+      { enabled: !!detailsAccountId }
+    )
+  );
+
+  const { data: accountClipsData, isLoading: isLoadingClips } = useQuery(
+    trpc.tiktokAccount.getClips.queryOptions(
+      {
+        id: detailsAccountId ?? "",
+        limit: 20,
+        offset: clipsPage * 20,
+      },
+      { enabled: !!detailsAccountId }
+    )
   );
 
   // OAuth mutations
@@ -156,31 +188,53 @@ export function TikTokAccountsContent({ user }: TikTokAccountsContentProps) {
   // Handle OAuth callback
   useEffect(() => {
     const code = searchParams.get("code");
+    const state = searchParams.get("state");
     const error = searchParams.get("error");
     const errorDescription = searchParams.get("error_description");
 
     if (error) {
-      // Use a timeout to avoid synchronous state update during render
+      // Avoid duplicate error processing
+      if (connectError === (errorDescription ?? error)) return;
+
       const timer = setTimeout(() => {
+        console.log("[TikTok OAuth] Error in callback:", error, errorDescription);
         setConnectError(errorDescription ?? error);
         router.replace("/admin/tiktok-accounts");
+        localStorage.removeItem("tiktok_code_verifier");
       }, 0);
       return () => clearTimeout(timer);
     }
 
-    if (code && !isConnecting) {
-      // Use timeout to avoid synchronous state update
+    if (code && !isConnecting && !connectSuccess && !connectError) {
+      // Prevent processing the same code multiple times
+      if (processedCodeRef.current === code) return;
+      processedCodeRef.current = code;
+
       const timer = setTimeout(() => {
+        console.log("[TikTok OAuth] Processing callback code:", code.substring(0, 10) + "...");
         setIsConnecting(true);
         setConnectError(null);
 
+        // Retrieve code verifier from localStorage
+        const codeVerifier = localStorage.getItem("tiktok_code_verifier");
+        if (!codeVerifier) {
+          console.error("[TikTok OAuth] Code verifier not found in localStorage");
+          setConnectError("OAuth state error: code_verifier not found");
+          setIsConnecting(false);
+          router.replace("/admin/tiktok-accounts");
+          return;
+        }
+
         // Exchange code for token
         const redirectUri = `${window.location.origin}/admin/tiktok-accounts`;
-        exchangeCode.mutate({ code, redirectUri });
+        exchangeCode.mutate({ code, redirectUri, codeVerifier });
+        
+        // Clear stored code verifier immediately to prevent reuse
+        localStorage.removeItem("tiktok_code_verifier");
       }, 0);
       return () => clearTimeout(timer);
     }
-  }, [searchParams, exchangeCode, router, isConnecting]);
+  }, [searchParams, exchangeCode, router, isConnecting, connectSuccess, connectError]);
 
   const handleConnectAccount = async () => {
     setConnectError(null);
@@ -188,11 +242,23 @@ export function TikTokAccountsContent({ user }: TikTokAccountsContentProps) {
 
     try {
       const redirectUri = `${window.location.origin}/admin/tiktok-accounts`;
+      console.log("[Frontend] Starting OAuth flow with redirectUri:", redirectUri);
+      
       const result = await getAuthUrl.mutateAsync({ redirectUri });
+      
+      console.log("[Frontend] Received OAuth response:");
+      console.log("  - authUrl:", result.authUrl);
+      console.log("  - codeVerifier length:", result.codeVerifier?.length);
+
+      // Store code verifier in localStorage for later use
+      localStorage.setItem("tiktok_code_verifier", result.codeVerifier);
+      console.log("[Frontend] Stored codeVerifier in localStorage");
 
       // Redirect to TikTok OAuth
+      console.log("[Frontend] Redirecting to TikTok...");
       window.location.href = result.authUrl;
     } catch (error) {
+      console.error("[Frontend] OAuth flow error:", error);
       setConnectError(error instanceof Error ? error.message : "Failed to start OAuth flow");
     }
   };
@@ -423,7 +489,16 @@ export function TikTokAccountsContent({ user }: TikTokAccountsContentProps) {
                       </tr>
                     ) : (
                       accounts?.map((account) => (
-                        <tr key={account.id} className="group transition-colors hover:bg-muted/30">
+                        <tr 
+                          key={account.id} 
+                          className="group cursor-pointer transition-colors hover:bg-muted/30"
+                          onClick={(e) => {
+                            // Prevent opening details if clicking on actions or cloud phone buttons
+                            if ((e.target as HTMLElement).closest("button") || (e.target as HTMLElement).closest("a")) return;
+                            setDetailsAccountId(account.id);
+                            setClipsPage(0);
+                          }}
+                        >
                           <td className="px-6 py-4">
                             <div className="flex items-center gap-3">
                               <div className="flex size-10 items-center justify-center rounded-full bg-gradient-to-br from-pink-500 to-purple-600 text-sm font-medium text-white">
@@ -696,6 +771,200 @@ export function TikTokAccountsContent({ user }: TikTokAccountsContentProps) {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Account Details Side Panel */}
+      {detailsAccountId && (
+        <>
+          <div 
+            className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm transition-opacity"
+            onClick={() => setDetailsAccountId(null)}
+          />
+          <div className="fixed inset-y-0 right-0 z-50 w-full max-w-2xl border-l border-border bg-background shadow-2xl transition-transform duration-300 ease-in-out">
+            <div className="flex h-full flex-col">
+              {/* Header */}
+              <div className="flex items-center justify-between border-b border-border px-6 py-4">
+                <div>
+                  <h2 className="text-lg font-semibold">Account Details</h2>
+                  <p className="text-sm text-muted-foreground">
+                    {accounts?.find(a => a.id === detailsAccountId)?.name}
+                  </p>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setDetailsAccountId(null)}
+                >
+                  <X className="size-5" />
+                </Button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-6">
+                {/* Stats Cards */}
+                <div className="grid grid-cols-2 gap-4 sm:grid-cols-4 mb-8">
+                  <div className="rounded-lg border border-border bg-card p-4">
+                    <div className="flex items-center gap-2 text-muted-foreground">
+                      <Video className="size-4" />
+                      <span className="text-xs font-medium uppercase">Videos</span>
+                    </div>
+                    <p className="mt-2 text-2xl font-bold">
+                      {accountStats?.totalVideos.toLocaleString() ?? "-"}
+                    </p>
+                  </div>
+                  <div className="rounded-lg border border-border bg-card p-4">
+                    <div className="flex items-center gap-2 text-muted-foreground">
+                      <Heart className="size-4" />
+                      <span className="text-xs font-medium uppercase">Likes</span>
+                    </div>
+                    <p className="mt-2 text-2xl font-bold">
+                      {accountStats?.totalLikes.toLocaleString() ?? "-"}
+                    </p>
+                  </div>
+                  <div className="rounded-lg border border-border bg-card p-4">
+                    <div className="flex items-center gap-2 text-muted-foreground">
+                      <Share2 className="size-4" />
+                      <span className="text-xs font-medium uppercase">Shares</span>
+                    </div>
+                    <p className="mt-2 text-2xl font-bold">
+                      {accountStats?.totalShares.toLocaleString() ?? "-"}
+                    </p>
+                  </div>
+                  <div className="rounded-lg border border-border bg-card p-4">
+                    <div className="flex items-center gap-2 text-muted-foreground">
+                      <MessageCircle className="size-4" />
+                      <span className="text-xs font-medium uppercase">Comments</span>
+                    </div>
+                    <p className="mt-2 text-2xl font-bold">
+                      {accountStats?.totalComments.toLocaleString() ?? "-"}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Clips Table */}
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-semibold">Recent Clips</h3>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={clipsPage === 0 || isLoadingClips}
+                        onClick={() => setClipsPage(p => Math.max(0, p - 1))}
+                      >
+                        Previous
+                      </Button>
+                      <span className="text-sm text-muted-foreground">
+                        Page {clipsPage + 1}
+                      </span>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={!accountClipsData?.clips.length || accountClipsData.clips.length < 20 || isLoadingClips}
+                        onClick={() => setClipsPage(p => p + 1)}
+                      >
+                        Next
+                      </Button>
+                    </div>
+                  </div>
+
+                  {isLoadingClips ? (
+                    <div className="flex justify-center py-8">
+                      <RefreshCw className="size-6 animate-spin text-muted-foreground" />
+                    </div>
+                  ) : !accountClipsData?.clips.length ? (
+                    <div className="rounded-lg border border-border bg-muted/30 p-8 text-center text-muted-foreground">
+                      No clips found for this account
+                    </div>
+                  ) : (
+                    <div className="rounded-lg border border-border">
+                      <table className="w-full">
+                        <thead className="bg-muted/30 text-xs uppercase text-muted-foreground">
+                          <tr>
+                            <th className="px-4 py-3 text-left">Video</th>
+                            <th className="px-4 py-3 text-left">Status</th>
+                            <th className="px-4 py-3 text-right">Published</th>
+                            <th className="px-4 py-3 w-10"></th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-border">
+                          {accountClipsData.clips.map((clip) => (
+                            <>
+                              <tr 
+                                key={clip.id} 
+                                className="cursor-pointer hover:bg-muted/30"
+                                onClick={() => setExpandedClipId(expandedClipId === clip.id ? null : clip.id)}
+                              >
+                                <td className="px-4 py-3">
+                                  <div className="flex items-center gap-3">
+                                    <div className="flex size-10 shrink-0 items-center justify-center rounded bg-muted text-muted-foreground">
+                                      <Play className="size-4" />
+                                    </div>
+                                    <div className="min-w-0">
+                                      <p className="truncate font-medium text-sm">{clip.title}</p>
+                                      <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                                        <span className="flex items-center gap-1">
+                                          <Play className="size-3" />
+                                          {clip.latestStats?.views.toLocaleString() ?? 0}
+                                        </span>
+                                      </div>
+                                    </div>
+                                  </div>
+                                </td>
+                                <td className="px-4 py-3">
+                                  <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
+                                    clip.status === 'published' ? 'bg-emerald-50 text-emerald-700' :
+                                    clip.status === 'failed' ? 'bg-red-50 text-red-700' :
+                                    'bg-blue-50 text-blue-700'
+                                  }`}>
+                                    {clip.status}
+                                  </span>
+                                </td>
+                                <td className="px-4 py-3 text-right text-xs text-muted-foreground">
+                                  {clip.publishedAt ? new Date(clip.publishedAt).toLocaleDateString() : '-'}
+                                </td>
+                                <td className="px-4 py-3 text-center">
+                                  {expandedClipId === clip.id ? (
+                                    <ChevronUp className="size-4 text-muted-foreground" />
+                                  ) : (
+                                    <ChevronDown className="size-4 text-muted-foreground" />
+                                  )}
+                                </td>
+                              </tr>
+                              {expandedClipId === clip.id && (
+                                <tr className="bg-muted/20">
+                                  <td colSpan={4} className="px-4 py-4">
+                                    <div className="grid grid-cols-4 gap-4">
+                                      <div className="text-center">
+                                        <div className="text-xs text-muted-foreground mb-1">Views</div>
+                                        <div className="font-semibold">{clip.latestStats?.views.toLocaleString() ?? 0}</div>
+                                      </div>
+                                      <div className="text-center">
+                                        <div className="text-xs text-muted-foreground mb-1">Likes</div>
+                                        <div className="font-semibold">{clip.latestStats?.likes.toLocaleString() ?? 0}</div>
+                                      </div>
+                                      <div className="text-center">
+                                        <div className="text-xs text-muted-foreground mb-1">Shares</div>
+                                        <div className="font-semibold">{clip.latestStats?.shares.toLocaleString() ?? 0}</div>
+                                      </div>
+                                      <div className="text-center">
+                                        <div className="text-xs text-muted-foreground mb-1">Comments</div>
+                                        <div className="font-semibold">{clip.latestStats?.comments.toLocaleString() ?? 0}</div>
+                                      </div>
+                                    </div>
+                                  </td>
+                                </tr>
+                              )}
+                            </>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </>
       )}
     </div>
   );

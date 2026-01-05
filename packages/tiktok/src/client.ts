@@ -37,27 +37,83 @@ export class TikTokClient {
   }
 
   // ============================================================================
+  // PKCE Helper Methods
+  // ============================================================================
+
+  /**
+   * Generate a random code verifier for PKCE
+   */
+  private generateCodeVerifier(): string {
+    const array = new Uint8Array(32);
+    crypto.getRandomValues(array);
+    return this.base64UrlEncode(array);
+  }
+
+  /**
+   * Generate code challenge from code verifier using SHA-256
+   */
+  private async generateCodeChallenge(verifier: string): Promise<string> {
+    const encoder = new TextEncoder();
+    const data = encoder.encode(verifier);
+    const hash = await crypto.subtle.digest("SHA-256", data);
+    return this.base64UrlEncode(new Uint8Array(hash));
+  }
+
+  /**
+   * Base64 URL encode (without padding)
+   */
+  private base64UrlEncode(buffer: Uint8Array): string {
+    const base64 = btoa(String.fromCharCode(...buffer));
+    return base64
+      .replace(/\+/g, "-")
+      .replace(/\//g, "_")
+      .replace(/=/g, "");
+  }
+
+  // ============================================================================
   // OAuth 2.0 Methods
   // ============================================================================
 
   /**
-   * Generate the OAuth authorization URL
+   * Generate the OAuth authorization URL with PKCE
    * User should be redirected to this URL to authorize the app
+   * Returns both the URL and the code_verifier (must be stored for token exchange)
    */
-  getAuthorizationUrl(
+  async getAuthorizationUrl(
     redirectUri: string,
     state: string,
     scopes: TikTokScope[] = DEFAULT_SCOPES
-  ): string {
+  ): Promise<{ url: string; codeVerifier: string }> {
+    // Generate PKCE parameters
+    const codeVerifier = this.generateCodeVerifier();
+    const codeChallenge = await this.generateCodeChallenge(codeVerifier);
+
+    console.log("[TikTok] PKCE parameters generated:");
+    console.log("  - code_verifier length:", codeVerifier.length);
+    console.log("  - code_challenge:", codeChallenge);
+    console.log("  - redirect_uri:", redirectUri);
+    console.log("  - state:", state);
+    console.log("  - scopes:", scopes.join(","));
+
     const params = new URLSearchParams({
       client_key: this.clientKey,
       redirect_uri: redirectUri,
       response_type: "code",
       scope: scopes.join(","),
       state: state,
+      code_challenge: codeChallenge,
+      code_challenge_method: "S256",
     });
 
-    return `${TIKTOK_AUTH_URL}?${params.toString()}`;
+    const url = `${TIKTOK_AUTH_URL}?${params.toString()}`;
+    
+    console.log("[TikTok] Generated OAuth URL:");
+    console.log("  - Full URL:", url);
+
+    return {
+      url,
+      codeVerifier,
+    };
   }
 
   /**
@@ -65,7 +121,8 @@ export class TikTokClient {
    */
   async exchangeCodeForToken(
     code: string,
-    redirectUri: string
+    redirectUri: string,
+    codeVerifier: string
   ): Promise<StoredToken> {
     console.log("[TikTok] Exchanging authorization code for token...");
 
@@ -80,6 +137,7 @@ export class TikTokClient {
         code: code,
         grant_type: "authorization_code",
         redirect_uri: redirectUri,
+        code_verifier: codeVerifier,
       }),
     });
 

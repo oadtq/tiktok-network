@@ -50,20 +50,21 @@ export const tiktokOAuthRouter = {
         state: z.string().optional(),
       })
     )
-    .mutation(({ input }) => {
+    .mutation(async ({ input }) => {
       const client = getTikTokClient();
 
       // Generate a random state if not provided
       const state =
         input.state ?? Math.random().toString(36).substring(2, 15);
 
-      const authUrl = client.getAuthorizationUrl(input.redirectUri, state);
+      const { url: authUrl, codeVerifier } = await client.getAuthorizationUrl(input.redirectUri, state);
 
       console.log("[TikTok OAuth] Generated auth URL, state:", state);
 
       return {
         authUrl,
         state,
+        codeVerifier,
       };
     }),
 
@@ -75,6 +76,7 @@ export const tiktokOAuthRouter = {
       z.object({
         code: z.string(),
         redirectUri: z.string().url(),
+        codeVerifier: z.string(),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -85,7 +87,8 @@ export const tiktokOAuthRouter = {
       // Exchange code for token
       const tokenData = await client.exchangeCodeForToken(
         input.code,
-        input.redirectUri
+        input.redirectUri,
+        input.codeVerifier
       );
 
       console.log(

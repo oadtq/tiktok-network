@@ -8,6 +8,8 @@ import { z } from "zod/v4";
 
 import { desc, eq } from "@everylab/db";
 import {
+  clip,
+  clipStats,
   CreateTiktokAccountSchema,
   tiktokAccount,
   UpdateTiktokAccountSchema,
@@ -172,5 +174,83 @@ export const tiktokAccountRouter = {
     .mutation(async ({ ctx, input }) => {
       await ctx.db.delete(tiktokAccount).where(eq(tiktokAccount.id, input.id));
       return { success: true };
+    }),
+
+  /**
+   * Get aggregated stats for a TikTok account
+   */
+  getStats: adminProcedure
+    .input(z.object({ id: z.string().uuid() }))
+    .query(async ({ ctx, input }) => {
+      const accountClips = await ctx.db.query.clip.findMany({
+        where: eq(clip.tiktokAccountId, input.id),
+        with: {
+          stats: {
+            orderBy: desc(clipStats.recordedAt),
+            limit: 1,
+          },
+        },
+      });
+
+      let totalVideos = accountClips.length;
+      let totalLikes = 0;
+      let totalComments = 0;
+      let totalShares = 0;
+
+      for (const c of accountClips) {
+        const latestStats = c.stats[0];
+        if (latestStats) {
+          totalLikes += latestStats.likes;
+          totalComments += latestStats.comments;
+          totalShares += latestStats.shares;
+        }
+      }
+
+      return {
+        totalVideos,
+        totalLikes,
+        totalComments,
+        totalShares,
+      };
+    }),
+
+  /**
+   * Get paginated clips for a TikTok account
+   */
+  getClips: adminProcedure
+    .input(
+      z.object({
+        id: z.string().uuid(),
+        limit: z.number().min(1).max(100).default(20),
+        offset: z.number().min(0).default(0),
+      })
+    )
+    .query(async ({ ctx, input }) => {
+      const { id, limit, offset } = input;
+
+      const clips = await ctx.db.query.clip.findMany({
+        where: eq(clip.tiktokAccountId, id),
+        orderBy: desc(clip.createdAt),
+        limit,
+        offset,
+        with: {
+          stats: {
+            orderBy: desc(clipStats.recordedAt),
+            limit: 1,
+          },
+        },
+      });
+
+      const totalCount = await ctx.db.query.clip.findMany({
+        where: eq(clip.tiktokAccountId, id),
+      });
+
+      return {
+        clips: clips.map((c) => ({
+          ...c,
+          latestStats: c.stats[0] ?? null,
+        })),
+        total: totalCount.length,
+      };
     }),
 } satisfies TRPCRouterRecord;

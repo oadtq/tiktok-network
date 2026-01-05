@@ -12,6 +12,7 @@ export function initAuth<TExtraPlugins extends BetterAuthPlugin[] = []>(options:
   googleClientId?: string;
   googleClientSecret?: string;
   extraPlugins?: TExtraPlugins;
+  trustedOrigins?: string[];
 }) {
   const config = {
     database: drizzleAdapter(db, {
@@ -44,6 +45,7 @@ export function initAuth<TExtraPlugins extends BetterAuthPlugin[] = []>(options:
         console.error("BETTER AUTH API ERROR", error, ctx);
       },
     },
+    trustedOrigins: options.trustedOrigins,
   } satisfies BetterAuthOptions;
 
   return betterAuth(config);
