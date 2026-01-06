@@ -6,15 +6,20 @@
 import type { TRPCRouterRecord } from "@trpc/server";
 import { z } from "zod/v4";
 
-import { eq } from "@everylab/db";
-import { clip, clipStats, tiktokAccount } from "@everylab/db/schema";
+import { and, eq } from "@everylab/db";
+import {
+  clip,
+  clipStats,
+  tiktokAccount,
+  userTiktokAccount,
+} from "@everylab/db/schema";
 import {
   createTikTokClient,
   isTikTokConfigured,
   tiktokEnv,
 } from "@everylab/tiktok";
 
-import { adminProcedure } from "../trpc";
+import { adminProcedure, protectedProcedure } from "../trpc";
 
 // Create TikTok client if configured
 function getTikTokClient() {
@@ -384,6 +389,380 @@ export const tiktokOAuthRouter = {
         console.log("[TikTok OAuth] Videos synced successfully");
       } catch (error) {
         console.error("[TikTok OAuth] Failed to sync videos:", error);
+        // Don't fail the whole request if video sync fails
+      }
+
+      return updatedAccount;
+    }),
+
+  // =========================================
+  // CREATOR-FACING ENDPOINTS
+  // =========================================
+
+  /**
+   * Check if TikTok OAuth is configured (for creators)
+   */
+  creatorIsConfigured: protectedProcedure.query(() => {
+    return {
+      configured: isTikTokConfigured(),
+    };
+  }),
+
+  /**
+   * Get OAuth authorization URL for creators
+   */
+  creatorGetAuthorizationUrl: protectedProcedure
+    .input(
+      z.object({
+        redirectUri: z.string().url(),
+        state: z.string().optional(),
+      }),
+    )
+    .mutation(async ({ input }) => {
+      const client = getTikTokClient();
+
+      const state = input.state ?? Math.random().toString(36).substring(2, 15);
+
+      const { url: authUrl, codeVerifier } = await client.getAuthorizationUrl(
+        input.redirectUri,
+        state,
+      );
+
+      console.log("[TikTok OAuth Creator] Generated auth URL, state:", state);
+
+      return {
+        authUrl,
+        state,
+        codeVerifier,
+      };
+    }),
+
+  /**
+   * Exchange authorization code for tokens and link to user (creator)
+   */
+  creatorExchangeCode: protectedProcedure
+    .input(
+      z.object({
+        code: z.string(),
+        redirectUri: z.string().url(),
+        codeVerifier: z.string(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const client = getTikTokClient();
+
+      console.log("[TikTok OAuth Creator] Exchanging code for token...");
+
+      const tokenData = await client.exchangeCodeForToken(
+        input.code,
+        input.redirectUri,
+        input.codeVerifier,
+      );
+
+      console.log(
+        "[TikTok OAuth Creator] Token received, openId:",
+        tokenData.openId,
+      );
+
+      const userInfo = await client.getUserInfo(tokenData.accessToken);
+
+      console.log(
+        "[TikTok OAuth Creator] User info received:",
+        userInfo.display_name,
+      );
+
+      // Check if account already exists
+      const existingAccount = await ctx.db.query.tiktokAccount.findFirst({
+        where: eq(tiktokAccount.tiktokUserId, tokenData.openId),
+      });
+
+      let account;
+      let isNew = false;
+
+      if (existingAccount) {
+        // Update existing account with new tokens
+        console.log(
+          "[TikTok OAuth Creator] Updating existing account:",
+          existingAccount.id,
+        );
+
+        const [updatedAccount] = await ctx.db
+          .update(tiktokAccount)
+          .set({
+            accessToken: tokenData.accessToken,
+            refreshToken: tokenData.refreshToken,
+            tokenExpiresAt: tokenData.expiresAt,
+            name: userInfo.display_name,
+            followerCount: userInfo.follower_count ?? 0,
+            isActive: true,
+          })
+          .where(eq(tiktokAccount.id, existingAccount.id))
+          .returning();
+
+        account = updatedAccount;
+      } else {
+        // Create new account
+        console.log(
+          "[TikTok OAuth Creator] Creating new account for:",
+          userInfo.display_name,
+        );
+
+        const [newAccount] = await ctx.db
+          .insert(tiktokAccount)
+          .values({
+            name: userInfo.display_name,
+            tiktokUsername: userInfo.display_name
+              .replace(/\s+/g, "_")
+              .toLowerCase(),
+            tiktokUserId: tokenData.openId,
+            accessToken: tokenData.accessToken,
+            refreshToken: tokenData.refreshToken,
+            tokenExpiresAt: tokenData.expiresAt,
+            followerCount: userInfo.follower_count ?? 0,
+            isActive: true,
+          })
+          .returning();
+
+        account = newAccount;
+        isNew = true;
+
+        console.log(
+          "[TikTok OAuth Creator] New account created:",
+          newAccount?.id,
+        );
+      }
+
+      // Link account to user if not already linked
+      if (account) {
+        const existingLink = await ctx.db.query.userTiktokAccount.findFirst({
+          where: and(
+            eq(userTiktokAccount.userId, ctx.session.user.id),
+            eq(userTiktokAccount.tiktokAccountId, account.id),
+          ),
+        });
+
+        if (!existingLink) {
+          await ctx.db.insert(userTiktokAccount).values({
+            userId: ctx.session.user.id,
+            tiktokAccountId: account.id,
+          });
+          console.log(
+            "[TikTok OAuth Creator] Linked account to user:",
+            ctx.session.user.id,
+          );
+        }
+      }
+
+      return {
+        account,
+        isNew,
+      };
+    }),
+
+  /**
+   * Get creator's own connected TikTok accounts
+   */
+  creatorMyAccounts: protectedProcedure.query(async ({ ctx }) => {
+    const links = await ctx.db.query.userTiktokAccount.findMany({
+      where: eq(userTiktokAccount.userId, ctx.session.user.id),
+      with: {
+        tiktokAccount: true,
+      },
+    });
+
+    return links.map((l) => ({
+      ...l.tiktokAccount,
+      // Don't expose tokens to frontend
+      accessToken: l.tiktokAccount.accessToken ? "[CONNECTED]" : null,
+      refreshToken: undefined,
+    }));
+  }),
+
+  /**
+   * Disconnect a TikTok account (creator - only their own linked accounts)
+   */
+  creatorDisconnect: protectedProcedure
+    .input(z.object({ accountId: z.string().uuid() }))
+    .mutation(async ({ ctx, input }) => {
+      // Verify user owns this link
+      const link = await ctx.db.query.userTiktokAccount.findFirst({
+        where: and(
+          eq(userTiktokAccount.userId, ctx.session.user.id),
+          eq(userTiktokAccount.tiktokAccountId, input.accountId),
+        ),
+      });
+
+      if (!link) {
+        throw new Error("Account not linked to your profile");
+      }
+
+      // Remove the link
+      await ctx.db
+        .delete(userTiktokAccount)
+        .where(
+          and(
+            eq(userTiktokAccount.userId, ctx.session.user.id),
+            eq(userTiktokAccount.tiktokAccountId, input.accountId),
+          ),
+        );
+
+      console.log(
+        "[TikTok OAuth Creator] Unlinked account:",
+        input.accountId,
+        "from user:",
+        ctx.session.user.id,
+      );
+
+      return { success: true };
+    }),
+
+  /**
+   * Sync account info for creator's account (includes video sync)
+   */
+  creatorSyncAccount: protectedProcedure
+    .input(z.object({ accountId: z.string().uuid() }))
+    .mutation(async ({ ctx, input }) => {
+      // Verify user owns this link
+      const link = await ctx.db.query.userTiktokAccount.findFirst({
+        where: and(
+          eq(userTiktokAccount.userId, ctx.session.user.id),
+          eq(userTiktokAccount.tiktokAccountId, input.accountId),
+        ),
+        with: {
+          tiktokAccount: true,
+        },
+      });
+
+      if (!link) {
+        throw new Error("Account not linked to your profile");
+      }
+
+      const account = link.tiktokAccount;
+
+      if (!account.accessToken) {
+        throw new Error("Account is not connected");
+      }
+
+      const client = getTikTokClient();
+
+      console.log("[TikTok OAuth Creator] Syncing account info:", account.id);
+
+      // Check if token needs refresh
+      let accessToken = account.accessToken;
+      if (account.tokenExpiresAt && account.tokenExpiresAt <= new Date()) {
+        if (!account.refreshToken) {
+          throw new Error("Token expired and no refresh token available");
+        }
+
+        const newTokenData = await client.refreshAccessToken(
+          account.refreshToken,
+        );
+
+        await ctx.db
+          .update(tiktokAccount)
+          .set({
+            accessToken: newTokenData.accessToken,
+            refreshToken: newTokenData.refreshToken,
+            tokenExpiresAt: newTokenData.expiresAt,
+          })
+          .where(eq(tiktokAccount.id, input.accountId));
+
+        accessToken = newTokenData.accessToken;
+      }
+
+      const userInfo = await client.getUserInfo(accessToken);
+
+      const [updatedAccount] = await ctx.db
+        .update(tiktokAccount)
+        .set({
+          name: userInfo.display_name,
+          followerCount: userInfo.follower_count ?? 0,
+        })
+        .where(eq(tiktokAccount.id, input.accountId))
+        .returning();
+
+      console.log("[TikTok OAuth Creator] Account info synced:", account.id);
+
+      // Sync videos
+      try {
+        console.log(
+          "[TikTok OAuth Creator] Syncing videos for account:",
+          account.id,
+        );
+        const videoData = await client.getVideoList(accessToken);
+
+        console.log(
+          `[TikTok OAuth Creator] Found ${videoData.videos.length} videos`,
+        );
+
+        for (const video of videoData.videos) {
+          console.log(`[TikTok OAuth Creator] Processing video: ${video.id}`);
+          
+          // Check if clip exists
+          const existingClip = await ctx.db.query.clip.findFirst({
+            where: eq(clip.tiktokVideoId, video.id),
+          });
+
+          let clipId = existingClip?.id;
+
+          if (existingClip) {
+            console.log(`[TikTok OAuth Creator] Updating existing clip: ${existingClip.id}, current tiktokAccountId: ${existingClip.tiktokAccountId}`);
+            // Update existing clip - including tiktokAccountId to ensure it's set correctly
+            await ctx.db
+              .update(clip)
+              .set({
+                tiktokAccountId: account.id, // Ensure correct account ID is set
+                title:
+                  video.title ?? video.video_description ?? "Untitled TikTok",
+                description: video.video_description,
+                thumbnailUrl: video.cover_image_url,
+                tiktokVideoUrl: video.share_url,
+                publishedAt: new Date(video.create_time * 1000),
+                status: "published",
+                updatedAt: new Date(),
+              })
+              .where(eq(clip.id, existingClip.id));
+          } else {
+            console.log(`[TikTok OAuth Creator] Creating new clip for video: ${video.id}`);
+            // Create new clip - assign to the current user as owner
+            const [newClip] = await ctx.db
+              .insert(clip)
+              .values({
+                userId: ctx.session.user.id,
+                tiktokAccountId: account.id,
+                title:
+                  video.title ?? video.video_description ?? "Untitled TikTok",
+                description: video.video_description,
+                videoUrl: video.share_url ?? "",
+                thumbnailUrl: video.cover_image_url,
+                tiktokVideoId: video.id,
+                tiktokVideoUrl: video.share_url,
+                durationSeconds: video.duration,
+                publishedAt: new Date(video.create_time * 1000),
+                status: "published",
+              })
+              .returning();
+
+            clipId = newClip?.id;
+            console.log(`[TikTok OAuth Creator] Created clip: ${clipId}`);
+          }
+
+          if (clipId) {
+            // Add stats
+            await ctx.db.insert(clipStats).values({
+              clipId,
+              views: video.view_count ?? 0,
+              likes: video.like_count ?? 0,
+              comments: video.comment_count ?? 0,
+              shares: video.share_count ?? 0,
+            });
+            console.log(`[TikTok OAuth Creator] Added stats for clip: ${clipId}`);
+          }
+        }
+
+        console.log("[TikTok OAuth Creator] Videos synced successfully");
+      } catch (error) {
+        console.error("[TikTok OAuth Creator] Failed to sync videos:", error);
         // Don't fail the whole request if video sync fails
       }
 

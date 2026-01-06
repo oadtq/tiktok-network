@@ -359,4 +359,126 @@ export const tiktokAccountRouter = {
 
       return { success: true };
     }),
+
+  // =========================================
+  // CREATOR-FACING ENDPOINTS
+  // =========================================
+
+  /**
+   * Get aggregated stats for a TikTok account (creator - only their linked accounts)
+   */
+  creatorGetStats: protectedProcedure
+    .input(z.object({ id: z.string().uuid() }))
+    .query(async ({ ctx, input }) => {
+      // console.log("[creatorGetStats] Querying stats for account:", input.id);
+      // console.log("[creatorGetStats] User ID:", ctx.session.user.id);
+
+      // Verify user owns this link
+      const link = await ctx.db.query.userTiktokAccount.findFirst({
+        where: and(
+          eq(userTiktokAccount.userId, ctx.session.user.id),
+          eq(userTiktokAccount.tiktokAccountId, input.id),
+        ),
+      });
+
+      // console.log("[creatorGetStats] Link found:", !!link);
+
+      if (!link) {
+        throw new Error("Account not linked to your profile");
+      }
+
+      const accountClips = await ctx.db.query.clip.findMany({
+        where: eq(clip.tiktokAccountId, input.id),
+        with: {
+          stats: {
+            orderBy: desc(clipStats.recordedAt),
+            limit: 1,
+          },
+        },
+      });
+
+      // console.log("[creatorGetStats] Found clips:", accountClips.length);
+      // if (accountClips.length > 0) {
+      //   console.log("[creatorGetStats] First clip:", accountClips[0]?.id, accountClips[0]?.title);
+      //   console.log("[creatorGetStats] First clip stats:", accountClips[0]?.stats);
+      // }
+
+      const totalVideos = accountClips.length;
+      let totalLikes = 0;
+      let totalComments = 0;
+      let totalShares = 0;
+      let totalViews = 0;
+
+      for (const c of accountClips) {
+        const latestStats = c.stats[0];
+        if (latestStats) {
+          totalLikes += latestStats.likes;
+          totalComments += latestStats.comments;
+          totalShares += latestStats.shares;
+          totalViews += latestStats.views;
+        }
+      }
+
+      // console.log("[creatorGetStats] Results:", { totalVideos, totalViews, totalLikes, totalShares, totalComments });
+
+      return {
+        totalVideos,
+        totalLikes,
+        totalComments,
+        totalShares,
+        totalViews,
+      };
+    }),
+
+  /**
+   * Get paginated clips for a TikTok account (creator - only their linked accounts)
+   */
+  creatorGetClips: protectedProcedure
+    .input(
+      z.object({
+        id: z.string().uuid(),
+        limit: z.number().min(1).max(100).default(20),
+        offset: z.number().min(0).default(0),
+      }),
+    )
+    .query(async ({ ctx, input }) => {
+      // Verify user owns this link
+      const link = await ctx.db.query.userTiktokAccount.findFirst({
+        where: and(
+          eq(userTiktokAccount.userId, ctx.session.user.id),
+          eq(userTiktokAccount.tiktokAccountId, input.id),
+        ),
+      });
+
+      if (!link) {
+        throw new Error("Account not linked to your profile");
+      }
+
+      const { id, limit, offset } = input;
+
+      const clips = await ctx.db.query.clip.findMany({
+        where: eq(clip.tiktokAccountId, id),
+        orderBy: desc(clip.createdAt),
+        limit,
+        offset,
+        with: {
+          stats: {
+            orderBy: desc(clipStats.recordedAt),
+            limit: 1,
+          },
+        },
+      });
+
+      const totalCount = await ctx.db.query.clip.findMany({
+        where: eq(clip.tiktokAccountId, id),
+      });
+
+      return {
+        clips: clips.map((c) => ({
+          ...c,
+          latestStats: c.stats[0] ?? null,
+        })),
+        total: totalCount.length,
+      };
+    }),
 } satisfies TRPCRouterRecord;

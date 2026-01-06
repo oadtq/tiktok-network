@@ -2,7 +2,15 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LogOut } from "lucide-react";
+import { ChevronsUpDown, FileText, LogOut, Shield } from "lucide-react";
+
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@everylab/ui/dropdown-menu";
 
 import { authClient } from "~/auth/client";
 
@@ -100,30 +108,50 @@ export function Sidebar({
 
       {/* User Profile */}
       <div className="border-border border-t p-4">
-        <div className="flex items-center gap-3">
-          <div className="flex size-9 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 text-sm font-medium text-white">
-            {user.name.charAt(0).toUpperCase()}
-          </div>
-          <div className="flex-1 overflow-hidden">
-            <p className="text-foreground truncate text-sm font-medium">
-              {user.name}
-            </p>
-            <p className="text-muted-foreground truncate text-xs">
-              {user.role === "admin" ? "Admin" : user.email}
-            </p>
-          </div>
-          <button
-            onClick={() => {
-              void authClient.signOut().then(() => {
-                window.location.href = "/";
-              });
-            }}
-            className="text-muted-foreground hover:bg-accent hover:text-foreground rounded-lg p-2 transition-colors"
-            title="Sign out"
-          >
-            <LogOut className="size-4" />
-          </button>
-        </div>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button className="hover:bg-accent data-[state=open]:bg-accent flex w-full items-center gap-3 rounded-lg p-2 text-left transition-colors outline-none">
+              <div className="flex size-9 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 text-sm font-medium text-white">
+                {user.name.charAt(0).toUpperCase()}
+              </div>
+              <div className="flex-1 overflow-hidden">
+                <p className="text-foreground truncate text-sm font-medium">
+                  {user.name}
+                </p>
+                <p className="text-muted-foreground truncate text-xs">
+                  {user.role === "admin" ? "Admin" : user.email}
+                </p>
+              </div>
+              <ChevronsUpDown className="text-muted-foreground size-4" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="w-56" side="right">
+            <DropdownMenuItem asChild>
+              <Link href="/terms">
+                <FileText className="mr-2 size-4" />
+                Terms of Service
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link href="/privacy">
+                <Shield className="mr-2 size-4" />
+                Privacy Policy
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              onClick={() => {
+                void authClient.signOut().then(() => {
+                  window.location.href = "/";
+                });
+              }}
+              className="text-red-600 focus:text-red-600 focus:bg-red-50"
+            >
+              <LogOut className="mr-2 size-4" />
+              Sign out
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     </aside>
   );

@@ -13,18 +13,18 @@ import "~/app/styles.css";
 export const metadata: Metadata = {
   metadataBase: new URL(
     env.VERCEL_ENV === "production"
-      ? "https://tiktok-creator.network"
+      ? "https://everylab-content.network"
       : "http://localhost:3000",
   ),
-  title: "TikTok Creator Network",
+  title: "EveryLab Creator Network",
   description:
-    "Upload clips, schedule publishing, track performance, and earn rewards with TikTok Creator Network.",
+    "Upload clips, schedule publishing, track performance, and earn rewards with EveryLab Creator Network.",
   openGraph: {
-    title: "TikTok Creator Network",
+    title: "EveryLab Creator Network",
     description:
       "Upload clips, schedule publishing, track performance, and earn rewards.",
-    url: "https://tiktok-creator.network",
-    siteName: "TikTok Creator Network",
+    url: "https://everylab-content.network",
+    siteName: "EveryLab Creator Network",
   },
   twitter: {
     card: "summary_large_image",

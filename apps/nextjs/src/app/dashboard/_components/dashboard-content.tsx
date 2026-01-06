@@ -402,13 +402,6 @@ export function DashboardContent({ user }: DashboardContentProps) {
         title="Creator"
         logoIcon={Video}
         items={creatorNavItems}
-        bottomContent={
-          <>
-            <p className="text-muted-foreground mb-2 px-3 text-xs font-medium tracking-wider uppercase">
-              Support
-            </p>
-          </>
-        }
       />
 
       <main className="flex-1 overflow-auto">

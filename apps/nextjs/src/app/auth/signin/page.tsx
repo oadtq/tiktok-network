@@ -66,8 +66,8 @@ export default function SignInPage() {
           </h1>
           <p className="text-muted-foreground mt-2">
             {mode === "signin"
-              ? "Sign in to manage your TikTok clips"
-              : "Join the TikTok Creator Network"}
+              ? "Sign in to manage your clips"
+              : "Join the EveryLab Creator Network"}
           </p>
         </div>
 

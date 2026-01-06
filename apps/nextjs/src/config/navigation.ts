@@ -53,6 +53,11 @@ export const creatorNavItems = [
     icon: Home,
   },
   {
+    label: "Your Accounts",
+    href: "/dashboard/tiktok-accounts",
+    icon: Video,
+  },
+  {
     label: "Analytics",
     href: "/dashboard/analytics",
     icon: BarChart3,
