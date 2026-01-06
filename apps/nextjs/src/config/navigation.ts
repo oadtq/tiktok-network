@@ -2,6 +2,7 @@ import {
   BarChart3,
   Bot,
   FileVideo,
+  Shield,
   Home,
   Smartphone,
   Users,
@@ -23,6 +24,11 @@ export const adminNavItems = [
     label: "Cloud Phones",
     href: "/admin/cloud-phones",
     icon: Smartphone,
+  },
+  {
+    label: "Proxies",
+    href: "/admin/proxies",
+    icon: Shield,
   },
   {
     label: "Users",

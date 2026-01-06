@@ -36,6 +36,9 @@
       "cache": false,
       "interactive": true
     },
+    "generate": {
+      "cache": false
+    },
     "studio": {
       "cache": false,
       "persistent": true
