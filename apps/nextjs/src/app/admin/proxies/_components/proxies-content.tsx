@@ -16,12 +16,13 @@ import {
 import { Button } from "@everylab/ui/button";
 import { toast } from "@everylab/ui/toast";
 
+import type { ProxyFormValues } from "./proxy-form-modal";
 import type { NavItem } from "~/components/sidebar";
 import { Sidebar } from "~/components/sidebar";
 import { adminNavItems } from "~/config/navigation";
 import { useTRPC } from "~/trpc/react";
 import { ProxyAssignmentsModal } from "./proxy-assignments-modal";
-import { ProxyFormModal, type ProxyFormValues } from "./proxy-form-modal";
+import { ProxyFormModal } from "./proxy-form-modal";
 
 interface User {
   id: string;
@@ -41,9 +42,11 @@ export function ProxiesContent({ user }: ProxiesContentProps) {
   const [editProxyId, setEditProxyId] = useState<string | null>(null);
   const [assignProxyId, setAssignProxyId] = useState<string | null>(null);
 
-  const { data: proxies = [], isLoading, refetch } = useQuery(
-    trpc.proxy.list.queryOptions(),
-  );
+  const {
+    data: proxies = [],
+    isLoading,
+    refetch,
+  } = useQuery(trpc.proxy.list.queryOptions());
 
   const { data: cloudPhones = [] } = useQuery(
     trpc.cloudPhone.list.queryOptions(),
@@ -53,7 +56,9 @@ export function ProxiesContent({ user }: ProxiesContentProps) {
     trpc.proxy.sync.mutationOptions({
       onSuccess: (res) => {
         toast.success(`Synced ${res.synced} proxies from GeeLark`);
-        void queryClient.invalidateQueries({ queryKey: trpc.proxy.list.queryKey() });
+        void queryClient.invalidateQueries({
+          queryKey: trpc.proxy.list.queryKey(),
+        });
       },
       onError: (err) => toast.error(err.message),
     }),
@@ -64,7 +69,9 @@ export function ProxiesContent({ user }: ProxiesContentProps) {
       onSuccess: (res) => {
         toast.success(`Created ${res.successAmount} proxies`);
         setCreateOpen(false);
-        void queryClient.invalidateQueries({ queryKey: trpc.proxy.list.queryKey() });
+        void queryClient.invalidateQueries({
+          queryKey: trpc.proxy.list.queryKey(),
+        });
       },
       onError: (err) => toast.error(err.message),
     }),
@@ -75,7 +82,9 @@ export function ProxiesContent({ user }: ProxiesContentProps) {
       onSuccess: () => {
         toast.success("Proxy updated");
         setEditProxyId(null);
-        void queryClient.invalidateQueries({ queryKey: trpc.proxy.list.queryKey() });
+        void queryClient.invalidateQueries({
+          queryKey: trpc.proxy.list.queryKey(),
+        });
       },
       onError: (err) => toast.error(err.message),
     }),
@@ -85,7 +94,9 @@ export function ProxiesContent({ user }: ProxiesContentProps) {
     trpc.proxy.delete.mutationOptions({
       onSuccess: (res) => {
         toast.success(`Deleted ${res.deletedIds.length} proxies`);
-        void queryClient.invalidateQueries({ queryKey: trpc.proxy.list.queryKey() });
+        void queryClient.invalidateQueries({
+          queryKey: trpc.proxy.list.queryKey(),
+        });
       },
       onError: (err) => toast.error(err.message),
     }),
@@ -96,7 +107,9 @@ export function ProxiesContent({ user }: ProxiesContentProps) {
       onSuccess: () => {
         toast.success("Assignments saved");
         setAssignProxyId(null);
-        void queryClient.invalidateQueries({ queryKey: trpc.proxy.list.queryKey() });
+        void queryClient.invalidateQueries({
+          queryKey: trpc.proxy.list.queryKey(),
+        });
       },
       onError: (err) => toast.error(err.message),
     }),
@@ -109,7 +122,9 @@ export function ProxiesContent({ user }: ProxiesContentProps) {
   const navItems: NavItem[] = useMemo(
     () =>
       adminNavItems.map((item) =>
-        item.label === "Dashboard" ? { ...item, badge: pendingClips.length } : item,
+        item.label === "Dashboard"
+          ? { ...item, badge: pendingClips.length }
+          : item,
       ),
     [pendingClips.length],
   );
@@ -171,7 +186,9 @@ export function ProxiesContent({ user }: ProxiesContentProps) {
                 onClick={() => void refetch()}
                 disabled={isLoading}
               >
-                <RefreshCw className={`size-4 ${isLoading ? "animate-spin" : ""}`} />
+                <RefreshCw
+                  className={`size-4 ${isLoading ? "animate-spin" : ""}`}
+                />
                 Refresh
               </Button>
               <Button
@@ -256,8 +273,8 @@ export function ProxiesContent({ user }: ProxiesContentProps) {
                         </td>
                         <td className="px-6 py-4">
                           <div className="flex flex-wrap gap-2">
-                            {(p.assignedCloudPhones ?? []).length > 0 ? (
-                              (p.assignedCloudPhones ?? []).map((cp) => (
+                            {p.assignedCloudPhones.length > 0 ? (
+                              p.assignedCloudPhones.map((cp) => (
                                 <span
                                   key={cp.id}
                                   className="border-border bg-muted/40 text-foreground inline-flex max-w-[240px] items-center truncate rounded-full border px-2.5 py-1 text-xs font-medium"
@@ -362,8 +379,12 @@ export function ProxiesContent({ user }: ProxiesContentProps) {
                 scheme: values.scheme,
                 server: values.server,
                 port: values.port,
-                ...(values.username !== undefined ? { username: values.username } : {}),
-                ...(values.password !== undefined ? { password: values.password } : {}),
+                ...(values.username !== undefined
+                  ? { username: values.username }
+                  : {}),
+                ...(values.password !== undefined
+                  ? { password: values.password }
+                  : {}),
               },
             ],
           });
@@ -384,7 +405,9 @@ export function ProxiesContent({ user }: ProxiesContentProps) {
             : null
         }
         cloudPhones={cloudPhones}
-        defaultSelectedIds={(assignProxy?.assignedCloudPhones ?? []).map((c) => c.id)}
+        defaultSelectedIds={(assignProxy?.assignedCloudPhones ?? []).map(
+          (c) => c.id,
+        )}
         submitDisabled={setAssignmentsMutation.isPending}
         onClose={() => setAssignProxyId(null)}
         onSave={({ cloudPhoneIds, reassign }) => {
@@ -399,4 +422,3 @@ export function ProxiesContent({ user }: ProxiesContentProps) {
     </div>
   );
 }
-

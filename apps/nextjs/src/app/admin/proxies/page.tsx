@@ -17,4 +17,3 @@ export default async function ProxiesPage() {
 
   return <ProxiesContent user={session.user} />;
 }
-

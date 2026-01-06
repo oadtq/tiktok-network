@@ -106,12 +106,8 @@
           "name": "campaign_clip_campaign_id_campaign_id_fk",
           "tableFrom": "campaign_clip",
           "tableTo": "campaign",
-          "columnsFrom": [
-            "campaign_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["campaign_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -119,12 +115,8 @@
           "name": "campaign_clip_clip_id_clip_id_fk",
           "tableFrom": "campaign_clip",
           "tableTo": "clip",
-          "columnsFrom": [
-            "clip_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["clip_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -246,12 +238,8 @@
           "name": "clip_user_id_user_id_fk",
           "tableFrom": "clip",
           "tableTo": "user",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -259,12 +247,8 @@
           "name": "clip_tiktok_account_id_tiktok_account_id_fk",
           "tableFrom": "clip",
           "tableTo": "tiktok_account",
-          "columnsFrom": [
-            "tiktok_account_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["tiktok_account_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -334,12 +318,8 @@
           "name": "clip_stats_clip_id_clip_id_fk",
           "tableFrom": "clip_stats",
           "tableTo": "clip",
-          "columnsFrom": [
-            "clip_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["clip_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -538,12 +518,8 @@
           "name": "geelark_proxy_assignment_proxy_id_geelark_proxy_id_fk",
           "tableFrom": "geelark_proxy_assignment",
           "tableTo": "geelark_proxy",
-          "columnsFrom": [
-            "proxy_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["proxy_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -551,12 +527,8 @@
           "name": "geelark_proxy_assignment_cloud_phone_id_cloud_phone_id_fk",
           "tableFrom": "geelark_proxy_assignment",
           "tableTo": "cloud_phone",
-          "columnsFrom": [
-            "cloud_phone_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["cloud_phone_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -566,9 +538,7 @@
         "geelark_proxy_assignment_cloudPhoneId_unique": {
           "name": "geelark_proxy_assignment_cloudPhoneId_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "cloud_phone_id"
-          ]
+          "columns": ["cloud_phone_id"]
         }
       },
       "policies": {},
@@ -673,12 +643,8 @@
           "name": "geelark_task_cloud_phone_id_cloud_phone_id_fk",
           "tableFrom": "geelark_task",
           "tableTo": "cloud_phone",
-          "columnsFrom": [
-            "cloud_phone_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["cloud_phone_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         },
@@ -686,12 +652,8 @@
           "name": "geelark_task_clip_id_clip_id_fk",
           "tableFrom": "geelark_task",
           "tableTo": "clip",
-          "columnsFrom": [
-            "clip_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["clip_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -789,12 +751,8 @@
           "name": "tiktok_account_cloud_phone_id_cloud_phone_id_fk",
           "tableFrom": "tiktok_account",
           "tableTo": "cloud_phone",
-          "columnsFrom": [
-            "cloud_phone_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["cloud_phone_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -804,9 +762,7 @@
         "tiktok_account_tiktokUsername_unique": {
           "name": "tiktok_account_tiktokUsername_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "tiktok_username"
-          ]
+          "columns": ["tiktok_username"]
         }
       },
       "policies": {},
@@ -850,12 +806,8 @@
           "name": "user_tiktok_account_user_id_user_id_fk",
           "tableFrom": "user_tiktok_account",
           "tableTo": "user",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -863,12 +815,8 @@
           "name": "user_tiktok_account_tiktok_account_id_tiktok_account_id_fk",
           "tableFrom": "user_tiktok_account",
           "tableTo": "tiktok_account",
-          "columnsFrom": [
-            "tiktok_account_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["tiktok_account_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -968,12 +916,8 @@
           "name": "account_user_id_user_id_fk",
           "tableFrom": "account",
           "tableTo": "user",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -1049,12 +993,8 @@
           "name": "session_user_id_user_id_fk",
           "tableFrom": "session",
           "tableTo": "user",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -1064,9 +1004,7 @@
         "session_token_unique": {
           "name": "session_token_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "token"
-          ]
+          "columns": ["token"]
         }
       },
       "policies": {},
@@ -1160,9 +1098,7 @@
         "user_email_unique": {
           "name": "user_email_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "email"
-          ]
+          "columns": ["email"]
         }
       },
       "policies": {},
@@ -1223,42 +1159,22 @@
     "public.campaign_status": {
       "name": "campaign_status",
       "schema": "public",
-      "values": [
-        "draft",
-        "active",
-        "paused",
-        "completed"
-      ]
+      "values": ["draft", "active", "paused", "completed"]
     },
     "public.clip_status": {
       "name": "clip_status",
       "schema": "public",
-      "values": [
-        "draft",
-        "pending",
-        "approved",
-        "published",
-        "failed"
-      ]
+      "values": ["draft", "pending", "approved", "published", "failed"]
     },
     "public.geelark_task_status": {
       "name": "geelark_task_status",
       "schema": "public",
-      "values": [
-        "waiting",
-        "in_progress",
-        "completed",
-        "failed",
-        "cancelled"
-      ]
+      "values": ["waiting", "in_progress", "completed", "failed", "cancelled"]
     },
     "public.user_role": {
       "name": "user_role",
       "schema": "public",
-      "values": [
-        "creator",
-        "admin"
-      ]
+      "values": ["creator", "admin"]
     }
   },
   "schemas": {},

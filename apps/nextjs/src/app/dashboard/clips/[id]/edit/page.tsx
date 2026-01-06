@@ -15,4 +15,3 @@ export default async function ClipEditPage(props: {
   const { id } = await props.params;
   return <ClipEditContent user={session.user} clipId={id} />;
 }
-

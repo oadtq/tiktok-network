@@ -4,13 +4,13 @@ import { X } from "lucide-react";
 
 import { Button } from "@everylab/ui/button";
 
-export type ProxyFormValues = {
+export interface ProxyFormValues {
   scheme: string;
   server: string;
   port: number;
   username?: string;
   password?: string;
-};
+}
 
 export function ProxyFormModal(props: {
   open: boolean;
@@ -44,7 +44,9 @@ export function ProxyFormModal(props: {
           <div>
             <h2 className="text-foreground text-lg font-semibold">{title}</h2>
             {description ? (
-              <p className="text-muted-foreground mt-1 text-sm">{description}</p>
+              <p className="text-muted-foreground mt-1 text-sm">
+                {description}
+              </p>
             ) : null}
           </div>
           <button
@@ -62,13 +64,22 @@ export function ProxyFormModal(props: {
             e.preventDefault();
             const formData = new FormData(e.currentTarget);
 
-            const scheme = (formData.get("scheme") as string) ?? "";
-            const server = (formData.get("server") as string) ?? "";
-            const portRaw = (formData.get("port") as string) ?? "";
+            const schemeRaw = formData.get("scheme");
+            const serverRaw = formData.get("server");
+            const portRawValue = formData.get("port");
+
+            const scheme = typeof schemeRaw === "string" ? schemeRaw : "";
+            const server = typeof serverRaw === "string" ? serverRaw : "";
+            const portRaw =
+              typeof portRawValue === "string" ? portRawValue : "";
             const port = Number(portRaw);
 
-            const usernameRaw = (formData.get("username") as string) ?? "";
-            const passwordRaw = (formData.get("password") as string) ?? "";
+            const usernameValue = formData.get("username");
+            const passwordValue = formData.get("password");
+            const usernameRaw =
+              typeof usernameValue === "string" ? usernameValue : "";
+            const passwordRaw =
+              typeof passwordValue === "string" ? passwordValue : "";
 
             const username =
               usernameRaw.trim().length > 0 ? usernameRaw.trim() : undefined;
@@ -122,7 +133,9 @@ export function ProxyFormModal(props: {
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <label className="space-y-1">
-              <div className="text-foreground text-sm font-medium">Username</div>
+              <div className="text-foreground text-sm font-medium">
+                Username
+              </div>
               <input
                 name="username"
                 defaultValue={defaultValues.username ?? ""}
@@ -131,12 +144,16 @@ export function ProxyFormModal(props: {
               />
             </label>
             <label className="space-y-1">
-              <div className="text-foreground text-sm font-medium">Password</div>
+              <div className="text-foreground text-sm font-medium">
+                Password
+              </div>
               <input
                 name="password"
                 type="password"
                 defaultValue=""
-                placeholder={mode === "edit" ? "leave blank to keep" : "optional"}
+                placeholder={
+                  mode === "edit" ? "leave blank to keep" : "optional"
+                }
                 className="border-border bg-background text-foreground focus:ring-primary w-full rounded-lg border px-3 py-2 text-sm outline-none focus:ring-2"
               />
             </label>
@@ -155,4 +172,3 @@ export function ProxyFormModal(props: {
     </div>
   );
 }
-

@@ -358,7 +358,9 @@ export const adminRouter = {
         ? Math.floor(existingClip.scheduledAt.getTime() / 1000)
         : null;
       const scheduleAt =
-        requestedSec && requestedSec >= nowSec + 60 ? requestedSec : nowSec + 60;
+        requestedSec && requestedSec >= nowSec + 60
+          ? requestedSec
+          : nowSec + 60;
 
       console.log(
         `[Admin] Creating GeeLark publish task for clip ${input.clipId}, scheduleAt: ${scheduleAt}`,

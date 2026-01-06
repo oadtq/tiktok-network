@@ -5,13 +5,13 @@ import { Check, Search, X } from "lucide-react";
 
 import { Button } from "@everylab/ui/button";
 
-type CloudPhoneLite = {
+interface CloudPhoneLite {
   id: string;
   serialName: string | null;
   serialNo: string | null;
   countryName: string | null;
   status: number | null;
-};
+}
 
 export function ProxyAssignmentsModal(props: {
   open: boolean;
@@ -40,7 +40,8 @@ export function ProxyAssignmentsModal(props: {
     const q = query.trim().toLowerCase();
     if (!q) return cloudPhones;
     return cloudPhones.filter((p) => {
-      const haystack = `${p.serialName ?? ""} ${p.serialNo ?? ""} ${p.id} ${p.countryName ?? ""}`.toLowerCase();
+      const haystack =
+        `${p.serialName ?? ""} ${p.serialNo ?? ""} ${p.id} ${p.countryName ?? ""}`.toLowerCase();
       return haystack.includes(q);
     });
   }, [cloudPhones, query]);
@@ -96,7 +97,8 @@ export function ProxyAssignmentsModal(props: {
                   disabled={!canSelectMore}
                   onClick={() => {
                     setSelectedIds((prev) => {
-                      if (prev.includes(p.id)) return prev.filter((x) => x !== p.id);
+                      if (prev.includes(p.id))
+                        return prev.filter((x) => x !== p.id);
                       if (prev.length >= 3) return prev;
                       return [...prev, p.id];
                     });
@@ -156,7 +158,8 @@ export function ProxyAssignmentsModal(props: {
               Force reassign
             </div>
             <div className="text-muted-foreground text-xs">
-              If a cloud phone is already assigned to another proxy, move it here.
+              If a cloud phone is already assigned to another proxy, move it
+              here.
             </div>
           </div>
         </label>
@@ -176,4 +179,3 @@ export function ProxyAssignmentsModal(props: {
     </div>
   );
 }
-

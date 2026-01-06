@@ -7,7 +7,11 @@ import type { TRPCRouterRecord } from "@trpc/server";
 import { z } from "zod/v4";
 
 import { eq, inArray, sql } from "@everylab/db";
-import { cloudPhone, geelarkProxy, geelarkProxyAssignment } from "@everylab/db/schema";
+import {
+  cloudPhone,
+  geelarkProxy,
+  geelarkProxyAssignment,
+} from "@everylab/db/schema";
 import { GeeLarkClient, geelarkEnv } from "@everylab/geelark";
 
 import { adminProcedure } from "../trpc";
@@ -77,17 +81,17 @@ export const proxyRouter = {
 
     const pageSize = 100;
     let page = 1;
-    let total: number | null = null;
+    let total = 0;
     const all: Awaited<ReturnType<typeof client.listProxies>>["list"] = [];
 
     // Paginate until we've fetched `total` or we stop getting results.
     for (;;) {
       const res = await client.listProxies({ page, pageSize });
-      if (total === null) total = res.total;
+      if (page === 1) total = res.total;
       all.push(...res.list);
 
       if (res.list.length === 0) break;
-      if (total !== null && all.length >= total) break;
+      if (all.length >= total) break;
       if (res.list.length < pageSize) break;
       page++;
     }
@@ -123,7 +127,7 @@ export const proxyRouter = {
 
     return {
       synced: all.length,
-      total: total ?? all.length,
+      total,
       syncedAt: now,
     };
   }),
@@ -260,7 +264,9 @@ export const proxyRouter = {
           .delete(geelarkProxyAssignment)
           .where(inArray(geelarkProxyAssignment.proxyId, deletedIds));
 
-        await ctx.db.delete(geelarkProxy).where(inArray(geelarkProxy.id, deletedIds));
+        await ctx.db
+          .delete(geelarkProxy)
+          .where(inArray(geelarkProxy.id, deletedIds));
       }
 
       return { ...result, deletedIds };
@@ -307,11 +313,16 @@ export const proxyRouter = {
       const existingForPhones =
         cloudPhoneIds.length > 0
           ? await ctx.db.query.geelarkProxyAssignment.findMany({
-              where: inArray(geelarkProxyAssignment.cloudPhoneId, cloudPhoneIds),
+              where: inArray(
+                geelarkProxyAssignment.cloudPhoneId,
+                cloudPhoneIds,
+              ),
             })
           : [];
 
-      const conflicts = existingForPhones.filter((a) => a.proxyId !== input.proxyId);
+      const conflicts = existingForPhones.filter(
+        (a) => a.proxyId !== input.proxyId,
+      );
       if (conflicts.length > 0 && !input.reassign) {
         const conflictedIds = conflicts.map((c) => c.cloudPhoneId);
         throw new Error(
@@ -320,9 +331,12 @@ export const proxyRouter = {
       }
 
       if (conflicts.length > 0 && input.reassign) {
-        await ctx.db
-          .delete(geelarkProxyAssignment)
-          .where(inArray(geelarkProxyAssignment.cloudPhoneId, conflicts.map((c) => c.cloudPhoneId)));
+        await ctx.db.delete(geelarkProxyAssignment).where(
+          inArray(
+            geelarkProxyAssignment.cloudPhoneId,
+            conflicts.map((c) => c.cloudPhoneId),
+          ),
+        );
       }
 
       // Replace assignments for this proxy
@@ -342,4 +356,3 @@ export const proxyRouter = {
       return { proxyId: input.proxyId, cloudPhoneIds };
     }),
 } satisfies TRPCRouterRecord;
-

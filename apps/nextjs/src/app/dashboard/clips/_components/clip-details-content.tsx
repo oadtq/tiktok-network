@@ -1,7 +1,7 @@
 "use client";
 
-import Link from "next/link";
 import { useMemo } from "react";
+import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, Edit, RefreshCw, Send, Video, X } from "lucide-react";
 
@@ -54,10 +54,10 @@ export function ClipDetailsContent(props: {
   );
 
   const title = useMemo(() => {
-    if (clipQuery.isLoading) return "Clip";
+    if (clipQuery.fetchStatus === "fetching") return "Clip";
     if (!clip) return "Clip not found";
     return clip.title;
-  }, [clip, clipQuery.isLoading]);
+  }, [clip, clipQuery.fetchStatus]);
 
   return (
     <div className="bg-background flex min-h-screen">
@@ -84,7 +84,9 @@ export function ClipDetailsContent(props: {
                   {title}
                 </h1>
                 <p className="text-muted-foreground text-sm">
-                  {clip ? "Clip details" : "This clip doesn’t exist or you don’t have access"}
+                  {clip
+                    ? "Clip details"
+                    : "This clip doesn’t exist or you don’t have access"}
                 </p>
               </div>
             </div>
@@ -125,7 +127,7 @@ export function ClipDetailsContent(props: {
         </header>
 
         <div className="p-8">
-          {clipQuery.isLoading ? (
+          {clipQuery.fetchStatus === "fetching" ? (
             <div className="flex items-center justify-center py-12">
               <RefreshCw className="text-muted-foreground size-8 animate-spin" />
             </div>
@@ -167,7 +169,8 @@ export function ClipDetailsContent(props: {
                     </div>
                     <span
                       className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-medium ${
-                        statusColors[clip.status] ?? "bg-muted text-muted-foreground"
+                        statusColors[clip.status] ??
+                        "bg-muted text-muted-foreground"
                       }`}
                     >
                       {statusLabels[clip.status] ?? clip.status}
@@ -192,7 +195,9 @@ export function ClipDetailsContent(props: {
                     <div className="flex justify-between gap-4">
                       <dt className="text-muted-foreground">TikTok account</dt>
                       <dd className="text-foreground font-medium">
-                        {clip.tiktokAccount ? `@${clip.tiktokAccount.tiktokUsername}` : "—"}
+                        {clip.tiktokAccount
+                          ? `@${clip.tiktokAccount.tiktokUsername}`
+                          : "—"}
                       </dd>
                     </div>
                   </dl>
@@ -205,4 +210,3 @@ export function ClipDetailsContent(props: {
     </div>
   );
 }
-

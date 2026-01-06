@@ -80,22 +80,25 @@ export const geelarkProxy = pgTable("geelark_proxy", (t) => ({
     .$onUpdateFn(() => new Date()),
 }));
 
-export const geelarkProxyAssignment = pgTable("geelark_proxy_assignment", (t) => ({
-  id: t.uuid().notNull().primaryKey().defaultRandom(),
-  proxyId: t
-    .varchar({ length: 256 })
-    .notNull()
-    .references(() => geelarkProxy.id, { onDelete: "cascade" }),
-  cloudPhoneId: t
-    .varchar({ length: 256 })
-    .notNull()
-    .unique()
-    .references(() => cloudPhone.id, { onDelete: "cascade" }),
-  createdAt: t
-    .timestamp({ mode: "date", withTimezone: true })
-    .defaultNow()
-    .notNull(),
-}));
+export const geelarkProxyAssignment = pgTable(
+  "geelark_proxy_assignment",
+  (t) => ({
+    id: t.uuid().notNull().primaryKey().defaultRandom(),
+    proxyId: t
+      .varchar({ length: 256 })
+      .notNull()
+      .references(() => geelarkProxy.id, { onDelete: "cascade" }),
+    cloudPhoneId: t
+      .varchar({ length: 256 })
+      .notNull()
+      .unique()
+      .references(() => cloudPhone.id, { onDelete: "cascade" }),
+    createdAt: t
+      .timestamp({ mode: "date", withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  }),
+);
 
 export const geelarkProxyRelations = relations(geelarkProxy, ({ many }) => ({
   assignments: many(geelarkProxyAssignment),
