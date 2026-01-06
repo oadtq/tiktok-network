@@ -105,10 +105,21 @@ export const tiktokOAuthRouter = {
 
       console.log("[TikTok OAuth] User info received:", userInfo.display_name);
 
-      // Check if account already exists
-      const existingAccount = await ctx.db.query.tiktokAccount.findFirst({
+      const generatedUsername = userInfo.display_name
+        .replace(/\s+/g, "_")
+        .toLowerCase();
+
+      // Check if account already exists by OpenID
+      let existingAccount = await ctx.db.query.tiktokAccount.findFirst({
         where: eq(tiktokAccount.tiktokUserId, tokenData.openId),
       });
+
+      // If not found by OpenID, check by username (to handle manual -> oauth upgrade)
+      if (!existingAccount) {
+        existingAccount = await ctx.db.query.tiktokAccount.findFirst({
+          where: eq(tiktokAccount.tiktokUsername, generatedUsername),
+        });
+      }
 
       if (existingAccount) {
         // Update existing account with new tokens
@@ -120,6 +131,7 @@ export const tiktokOAuthRouter = {
         const [updatedAccount] = await ctx.db
           .update(tiktokAccount)
           .set({
+            tiktokUserId: tokenData.openId, // Update to OpenID
             accessToken: tokenData.accessToken,
             refreshToken: tokenData.refreshToken,
             tokenExpiresAt: tokenData.expiresAt,
@@ -146,9 +158,7 @@ export const tiktokOAuthRouter = {
         .insert(tiktokAccount)
         .values({
           name: userInfo.display_name,
-          tiktokUsername: userInfo.display_name
-            .replace(/\s+/g, "_")
-            .toLowerCase(),
+          tiktokUsername: generatedUsername,
           tiktokUserId: tokenData.openId,
           accessToken: tokenData.accessToken,
           refreshToken: tokenData.refreshToken,
@@ -471,7 +481,11 @@ export const tiktokOAuthRouter = {
         userInfo.display_name,
       );
 
-      // Check if account already exists
+      const generatedUsername = userInfo.display_name
+        .replace(/\s+/g, "_")
+        .toLowerCase();
+
+      // Check if account already exists by OpenID
       const existingAccount = await ctx.db.query.tiktokAccount.findFirst({
         where: eq(tiktokAccount.tiktokUserId, tokenData.openId),
       });
@@ -482,7 +496,7 @@ export const tiktokOAuthRouter = {
       if (existingAccount) {
         // Update existing account with new tokens
         console.log(
-          "[TikTok OAuth Creator] Updating existing account:",
+          "[TikTok OAuth Creator] Updating existing account (by OpenID):",
           existingAccount.id,
         );
 
@@ -501,35 +515,62 @@ export const tiktokOAuthRouter = {
 
         account = updatedAccount;
       } else {
-        // Create new account
-        console.log(
-          "[TikTok OAuth Creator] Creating new account for:",
-          userInfo.display_name,
-        );
+        // Check by username (to handle manual -> oauth upgrade)
+        const existingAccountByUsername =
+          await ctx.db.query.tiktokAccount.findFirst({
+            where: eq(tiktokAccount.tiktokUsername, generatedUsername),
+          });
 
-        const [newAccount] = await ctx.db
-          .insert(tiktokAccount)
-          .values({
-            name: userInfo.display_name,
-            tiktokUsername: userInfo.display_name
-              .replace(/\s+/g, "_")
-              .toLowerCase(),
-            tiktokUserId: tokenData.openId,
-            accessToken: tokenData.accessToken,
-            refreshToken: tokenData.refreshToken,
-            tokenExpiresAt: tokenData.expiresAt,
-            followerCount: userInfo.follower_count ?? 0,
-            isActive: true,
-          })
-          .returning();
+        if (existingAccountByUsername) {
+          console.log(
+            "[TikTok OAuth Creator] Updating existing account (by Username):",
+            existingAccountByUsername.id,
+          );
 
-        account = newAccount;
-        isNew = true;
+          const [updatedAccount] = await ctx.db
+            .update(tiktokAccount)
+            .set({
+              tiktokUserId: tokenData.openId, // Update to OpenID
+              accessToken: tokenData.accessToken,
+              refreshToken: tokenData.refreshToken,
+              tokenExpiresAt: tokenData.expiresAt,
+              name: userInfo.display_name,
+              followerCount: userInfo.follower_count ?? 0,
+              isActive: true,
+            })
+            .where(eq(tiktokAccount.id, existingAccountByUsername.id))
+            .returning();
 
-        console.log(
-          "[TikTok OAuth Creator] New account created:",
-          newAccount?.id,
-        );
+          account = updatedAccount;
+        } else {
+          // Create new account
+          console.log(
+            "[TikTok OAuth Creator] Creating new account for:",
+            userInfo.display_name,
+          );
+
+          const [newAccount] = await ctx.db
+            .insert(tiktokAccount)
+            .values({
+              name: userInfo.display_name,
+              tiktokUsername: generatedUsername,
+              tiktokUserId: tokenData.openId,
+              accessToken: tokenData.accessToken,
+              refreshToken: tokenData.refreshToken,
+              tokenExpiresAt: tokenData.expiresAt,
+              followerCount: userInfo.follower_count ?? 0,
+              isActive: true,
+            })
+            .returning();
+
+          account = newAccount;
+          isNew = true;
+
+          console.log(
+            "[TikTok OAuth Creator] New account created:",
+            newAccount?.id,
+          );
+        }
       }
 
       // Link account to user if not already linked
@@ -612,6 +653,31 @@ export const tiktokOAuthRouter = {
         "from user:",
         ctx.session.user.id,
       );
+
+      // Check if any other users are linked to this account
+      const remainingLinks = await ctx.db.query.userTiktokAccount.findMany({
+        where: eq(userTiktokAccount.tiktokAccountId, input.accountId),
+      });
+
+      if (remainingLinks.length === 0) {
+        console.log(
+          "[TikTok OAuth Creator] No remaining users, clearing tokens for account:",
+          input.accountId,
+        );
+
+        // If no users are linked, clear the tokens and deactivate the account
+        // This ensures we don't keep using tokens for an "orphaned" account
+        await ctx.db
+          .update(tiktokAccount)
+          .set({
+            accessToken: null,
+            refreshToken: null,
+            tokenExpiresAt: null,
+            isActive: false,
+            updatedAt: new Date(),
+          })
+          .where(eq(tiktokAccount.id, input.accountId));
+      }
 
       return { success: true };
     }),
