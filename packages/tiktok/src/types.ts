@@ -115,7 +115,6 @@ export type TikTokScope = (typeof TIKTOK_SCOPES)[keyof typeof TIKTOK_SCOPES];
 // Default scopes for our app
 export const DEFAULT_SCOPES: TikTokScope[] = [
   TIKTOK_SCOPES.USER_INFO_BASIC,
-  TIKTOK_SCOPES.USER_INFO_PROFILE,
   TIKTOK_SCOPES.USER_INFO_STATS,
   TIKTOK_SCOPES.VIDEO_LIST,
 ];
