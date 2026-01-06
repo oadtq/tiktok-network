@@ -1,5 +1,5 @@
 import { relations } from "drizzle-orm";
-import { pgEnum, pgTable } from "drizzle-orm/pg-core";
+import { index, pgEnum, pgTable } from "drizzle-orm/pg-core";
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -130,6 +130,12 @@ export const clip = pgTable("clip", (t) => ({
   updatedAt: t
     .timestamp({ mode: "date", withTimezone: true })
     .$onUpdateFn(() => new Date()),
+}), (table) => ({
+  statusIdx: index("clip_status_idx").on(table.status),
+  userIdIdx: index("clip_user_id_idx").on(table.userId),
+  tiktokAccountIdIdx: index("clip_tiktok_account_id_idx").on(table.tiktokAccountId),
+  createdAtIdx: index("clip_created_at_idx").on(table.createdAt),
+  statusCreatedAtIdx: index("clip_status_created_at_idx").on(table.status, table.createdAt),
 }));
 
 export const clipRelations = relations(clip, ({ one, many }) => ({
