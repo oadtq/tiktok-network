@@ -5,7 +5,9 @@ import { admin } from "better-auth/plugins";
 
 import { db } from "@everylab/db/client";
 
-export function initAuth<TExtraPlugins extends BetterAuthPlugin[] = []>(options: {
+export function initAuth<
+  TExtraPlugins extends BetterAuthPlugin[] = [],
+>(options: {
   baseUrl: string;
   secret: string | undefined;
   // Google OAuth for TikTok creators

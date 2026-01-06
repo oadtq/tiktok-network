@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useQuery } from "@tanstack/react-query";
 import {
   ChevronDown,
   Clock,
@@ -12,14 +13,13 @@ import {
   Share2,
   Video,
 } from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
 
 import { Button } from "@everylab/ui/button";
 
-import { useTRPC } from "~/trpc/react";
-import { Sidebar } from "~/components/sidebar";
 import type { NavItem } from "~/components/sidebar";
+import { Sidebar } from "~/components/sidebar";
 import { adminNavItems } from "~/config/navigation";
+import { useTRPC } from "~/trpc/react";
 
 interface User {
   id: string;
@@ -27,18 +27,16 @@ interface User {
   email: string;
 }
 
-interface AdminStatisticsContentProps {
+interface AdminAnalyticsContentProps {
   user: User;
 }
 
-type ClipStatus = "draft" | "submitted" | "approved" | "rejected" | "publishing" | "published" | "failed";
+type ClipStatus = "draft" | "pending" | "approved" | "published" | "failed";
 
 const statusConfig: Record<ClipStatus, { color: string; label: string }> = {
   draft: { color: "bg-gray-100 text-gray-600", label: "Draft" },
-  submitted: { color: "bg-amber-50 text-amber-600", label: "Pending Review" },
+  pending: { color: "bg-amber-50 text-amber-600", label: "Pending" },
   approved: { color: "bg-blue-50 text-blue-600", label: "Approved" },
-  rejected: { color: "bg-red-50 text-red-600", label: "Rejected" },
-  publishing: { color: "bg-purple-50 text-purple-600", label: "Publishing" },
   published: { color: "bg-emerald-50 text-emerald-600", label: "Published" },
   failed: { color: "bg-red-50 text-red-700", label: "Failed" },
 };
@@ -50,8 +48,6 @@ function getStatusColor(status: ClipStatus): string {
 function getStatusLabel(status: ClipStatus): string {
   return statusConfig[status].label;
 }
-
-
 
 // Stat Card Component
 function StatCard({
@@ -66,11 +62,11 @@ function StatCard({
   accentColor?: string;
 }) {
   return (
-    <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
+    <div className="border-border bg-card rounded-xl border p-5 shadow-sm">
       <div className="flex items-start justify-between">
         <div className="flex-1">
-          <p className="text-sm font-medium text-muted-foreground">{title}</p>
-          <p className="mt-2 text-2xl font-semibold tracking-tight text-foreground">
+          <p className="text-muted-foreground text-sm font-medium">{title}</p>
+          <p className="text-foreground mt-2 text-2xl font-semibold tracking-tight">
             {typeof value === "number" ? value.toLocaleString() : value}
           </p>
         </div>
@@ -97,7 +93,7 @@ const timeRangeOptions: { value: TimeRange; label: string }[] = [
 
 function getDateFromRange(range: TimeRange): string | undefined {
   if (range === "all") return undefined;
-  
+
   const now = new Date();
   switch (range) {
     case "1d":
@@ -115,14 +111,16 @@ function getDateFromRange(range: TimeRange): string | undefined {
 
 const CLIPS_PER_PAGE = 10;
 
-export function AdminStatisticsContent({ user }: AdminStatisticsContentProps) {
+export function AdminAnalyticsContent({ user }: AdminAnalyticsContentProps) {
   const trpc = useTRPC();
   const [selectedUserId, setSelectedUserId] = useState<string>("all");
   const [timeRange, setTimeRange] = useState<TimeRange>("all");
   const [currentPage, setCurrentPage] = useState(0);
 
   // Get pending count for badge
-  const { data: pendingClips = [] } = useQuery(trpc.admin.pendingClips.queryOptions());
+  const { data: pendingClips = [] } = useQuery(
+    trpc.admin.pendingClips.queryOptions(),
+  );
 
   // Query for users list
   const { data: users = [] } = useQuery(trpc.admin.users.queryOptions());
@@ -135,19 +133,19 @@ export function AdminStatisticsContent({ user }: AdminStatisticsContentProps) {
         limit: CLIPS_PER_PAGE,
         offset: currentPage * CLIPS_PER_PAGE,
       },
-      { enabled: selectedUserId === "all" }
-    )
+      { enabled: selectedUserId === "all" },
+    ),
   );
 
   // Query for user stats (when a specific user is selected)
   const { data: userStats } = useQuery(
     trpc.admin.getUserStats.queryOptions(
-      { 
+      {
         userId: selectedUserId,
         dateFrom: getDateFromRange(timeRange),
       },
-      { enabled: selectedUserId !== "all" }
-    )
+      { enabled: selectedUserId !== "all" },
+    ),
   );
 
   // Use real API data for both "all" and specific user views  
@@ -165,13 +163,13 @@ export function AdminStatisticsContent({ user }: AdminStatisticsContentProps) {
         totalShares: userStats?.totalShares ?? 0,
       };
 
-  const clips = selectedUserId === "all" 
-    ? (allClipsStats?.clips ?? [])
-    : (userStats?.clips ?? []);
+  const clips =
+    selectedUserId === "all"
+      ? (allClipsStats?.clips ?? [])
+      : (userStats?.clips ?? []);
 
-  const totalClips = selectedUserId === "all"
-    ? (allClipsStats?.totalClips ?? 0)
-    : clips.length;
+  const totalClips =
+    selectedUserId === "all" ? (allClipsStats?.totalClips ?? 0) : clips.length;
 
   const totalPages = Math.ceil(totalClips / CLIPS_PER_PAGE);
 
@@ -195,7 +193,7 @@ export function AdminStatisticsContent({ user }: AdminStatisticsContentProps) {
   });
 
   return (
-    <div className="flex min-h-screen bg-background">
+    <div className="bg-background flex min-h-screen">
       <Sidebar
         user={{ ...user, role: "admin" }}
         title="Admin"
@@ -203,12 +201,12 @@ export function AdminStatisticsContent({ user }: AdminStatisticsContentProps) {
         items={navItems}
         bottomContent={
           <>
-            <p className="mb-2 px-3 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+            <p className="text-muted-foreground mb-2 px-3 text-xs font-medium tracking-wider uppercase">
               Switch View
             </p>
             <Link
               href="/dashboard"
-              className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+              className="text-muted-foreground hover:bg-accent hover:text-foreground flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors"
             >
               <Video className="size-5" />
               Creator Dashboard
@@ -219,24 +217,25 @@ export function AdminStatisticsContent({ user }: AdminStatisticsContentProps) {
 
       {/* Main Content */}
       <main className="flex-1 overflow-auto">
-        {/* Header */}
-        {/* <header className="sticky top-0 z-10 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <header className="border-border bg-background/95 supports-[backdrop-filter]:bg-background/60 sticky top-0 z-10 border-b backdrop-blur">
           <div className="flex h-16 items-center px-8">
-            <h1 className="text-xl font-semibold text-foreground">Statistics</h1>
+            <h1 className="text-foreground text-xl font-semibold">Analytics</h1>
           </div>
-        </header> */}
+        </header>
 
         <div className="space-y-6 p-8">
           {/* Filters Row */}
           <div className="flex flex-wrap items-center gap-4">
             {/* User Selector */}
             <div className="flex items-center gap-2">
-              <label className="text-sm font-medium text-foreground">View stats for:</label>
+              <label className="text-foreground text-sm font-medium">
+                View stats for:
+              </label>
               <div className="relative">
                 <select
                   value={selectedUserId}
                   onChange={(e) => handleUserChange(e.target.value)}
-                  className="appearance-none rounded-lg border border-border bg-card px-4 py-2 pr-10 text-sm font-medium outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+                  className="border-border bg-card focus:border-primary focus:ring-primary appearance-none rounded-lg border px-4 py-2 pr-10 text-sm font-medium outline-none focus:ring-1"
                 >
                   <option value="all">All Accounts</option>
                   {users.map((user) => (
@@ -245,18 +244,22 @@ export function AdminStatisticsContent({ user }: AdminStatisticsContentProps) {
                     </option>
                   ))}
                 </select>
-                <ChevronDown className="absolute right-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+                <ChevronDown className="text-muted-foreground pointer-events-none absolute top-1/2 right-3 size-4 -translate-y-1/2" />
               </div>
             </div>
 
             {/* Time Range Selector */}
             <div className="flex items-center gap-2">
-              <label className="text-sm font-medium text-foreground">Time range:</label>
+              <label className="text-foreground text-sm font-medium">
+                Time range:
+              </label>
               <div className="relative">
                 <select
                   value={timeRange}
-                  onChange={(e) => handleTimeRangeChange(e.target.value as TimeRange)}
-                  className="appearance-none rounded-lg border border-border bg-card px-4 py-2 pr-10 text-sm font-medium outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+                  onChange={(e) =>
+                    handleTimeRangeChange(e.target.value as TimeRange)
+                  }
+                  className="border-border bg-card focus:border-primary focus:ring-primary appearance-none rounded-lg border px-4 py-2 pr-10 text-sm font-medium outline-none focus:ring-1"
                 >
                   {timeRangeOptions.map((option) => (
                     <option key={option.value} value={option.value}>
@@ -264,7 +267,7 @@ export function AdminStatisticsContent({ user }: AdminStatisticsContentProps) {
                     </option>
                   ))}
                 </select>
-                <ChevronDown className="absolute right-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+                <ChevronDown className="text-muted-foreground pointer-events-none absolute top-1/2 right-3 size-4 -translate-y-1/2" />
               </div>
             </div>
           </div>
@@ -278,40 +281,45 @@ export function AdminStatisticsContent({ user }: AdminStatisticsContentProps) {
           </div>
 
           {/* Clips Stats Table */}
-          <div className="rounded-xl border border-border bg-card shadow-sm">
-            <div className="border-b border-border p-4 flex items-center justify-between">
-              <h2 className="font-semibold text-foreground">
-                Clip Performance {totalClips > 0 && <span className="text-muted-foreground font-normal">({totalClips} clips)</span>}
+          <div className="border-border bg-card rounded-xl border shadow-sm">
+            <div className="border-border flex items-center justify-between border-b p-4">
+              <h2 className="text-foreground font-semibold">
+                Clip Performance{" "}
+                {totalClips > 0 && (
+                  <span className="text-muted-foreground font-normal">
+                    ({totalClips} clips)
+                  </span>
+                )}
               </h2>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
-                  <tr className="border-b border-border bg-muted/30">
-                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                  <tr className="border-border bg-muted/30 border-b">
+                    <th className="text-muted-foreground px-4 py-3 text-left text-xs font-medium tracking-wider uppercase">
                       Title
                     </th>
                     {selectedUserId === "all" && (
-                      <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                      <th className="text-muted-foreground px-4 py-3 text-left text-xs font-medium tracking-wider uppercase">
                         Creator
                       </th>
                     )}
-                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                    <th className="text-muted-foreground px-4 py-3 text-left text-xs font-medium tracking-wider uppercase">
                       Status
                     </th>
-                    <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                    <th className="text-muted-foreground px-4 py-3 text-right text-xs font-medium tracking-wider uppercase">
                       <div className="flex items-center justify-end gap-1">
                         <Eye className="size-3" />
                         Views
                       </div>
                     </th>
-                    <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                    <th className="text-muted-foreground px-4 py-3 text-right text-xs font-medium tracking-wider uppercase">
                       <div className="flex items-center justify-end gap-1">
                         <Heart className="size-3" />
                         Likes
                       </div>
                     </th>
-                    <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                    <th className="text-muted-foreground px-4 py-3 text-right text-xs font-medium tracking-wider uppercase">
                       <div className="flex items-center justify-end gap-1">
                         <MessageCircle className="size-3" />
                         Comments
@@ -325,7 +333,7 @@ export function AdminStatisticsContent({ user }: AdminStatisticsContentProps) {
                     </th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-border">
+                <tbody className="divide-border divide-y">
                   {isLoadingAllStats && selectedUserId === "all" ? (
                     <tr>
                       <td colSpan={7} className="px-4 py-8 text-center text-muted-foreground">
@@ -343,31 +351,34 @@ export function AdminStatisticsContent({ user }: AdminStatisticsContentProps) {
                     clips.map((clip) => (
                       <tr key={clip.id} className="hover:bg-muted/30">
                         <td className="px-4 py-3">
-                          <p className="font-medium text-foreground">{clip.title}</p>
+                          <p className="text-foreground font-medium">
+                            {clip.title}
+                          </p>
                         </td>
                         {selectedUserId === "all" && (
                           <td className="px-4 py-3">
-                            <p className="text-sm text-muted-foreground">
-                              {(clip as { user?: { name: string } }).user?.name ?? "Unknown"}
+                            <p className="text-muted-foreground text-sm">
+                              {(clip as { user?: { name: string } }).user
+                                ?.name ?? "Unknown"}
                             </p>
                           </td>
                         )}
                         <td className="px-4 py-3">
                           <span
-                            className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${
-                              getStatusColor(clip.status as ClipStatus)
-                            }`}
+                            className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${getStatusColor(
+                              clip.status as ClipStatus,
+                            )}`}
                           >
                             {getStatusLabel(clip.status as ClipStatus)}
                           </span>
                         </td>
-                        <td className="px-4 py-3 text-right tabular-nums text-foreground">
+                        <td className="text-foreground px-4 py-3 text-right tabular-nums">
                           {(clip.latestStats?.views ?? 0).toLocaleString()}
                         </td>
-                        <td className="px-4 py-3 text-right tabular-nums text-foreground">
+                        <td className="text-foreground px-4 py-3 text-right tabular-nums">
                           {(clip.latestStats?.likes ?? 0).toLocaleString()}
                         </td>
-                        <td className="px-4 py-3 text-right tabular-nums text-foreground">
+                        <td className="text-foreground px-4 py-3 text-right tabular-nums">
                           {(clip.latestStats?.comments ?? 0).toLocaleString()}
                         </td>
                         <td className="px-4 py-3 text-right tabular-nums text-foreground">
@@ -382,9 +393,11 @@ export function AdminStatisticsContent({ user }: AdminStatisticsContentProps) {
 
             {/* Pagination (only for "all" view with multiple pages) */}
             {selectedUserId === "all" && totalPages > 1 && (
-              <div className="border-t border-border px-4 py-3 flex items-center justify-between">
-                <p className="text-sm text-muted-foreground">
-                  Showing {currentPage * CLIPS_PER_PAGE + 1} - {Math.min((currentPage + 1) * CLIPS_PER_PAGE, totalClips)} of {totalClips} clips
+              <div className="border-border flex items-center justify-between border-t px-4 py-3">
+                <p className="text-muted-foreground text-sm">
+                  Showing {currentPage * CLIPS_PER_PAGE + 1} -{" "}
+                  {Math.min((currentPage + 1) * CLIPS_PER_PAGE, totalClips)} of{" "}
+                  {totalClips} clips
                 </p>
                 <div className="flex items-center gap-2">
                   <Button
@@ -395,13 +408,15 @@ export function AdminStatisticsContent({ user }: AdminStatisticsContentProps) {
                   >
                     Previous
                   </Button>
-                  <span className="text-sm text-muted-foreground">
+                  <span className="text-muted-foreground text-sm">
                     Page {currentPage + 1} of {totalPages}
                   </span>
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => setCurrentPage((p) => Math.min(totalPages - 1, p + 1))}
+                    onClick={() =>
+                      setCurrentPage((p) => Math.min(totalPages - 1, p + 1))
+                    }
                     disabled={currentPage >= totalPages - 1}
                   >
                     Next

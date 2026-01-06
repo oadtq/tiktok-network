@@ -8,10 +8,7 @@ import { z } from "zod/v4";
 
 import { eq, sql } from "@everylab/db";
 import { cloudPhone, tiktokAccount } from "@everylab/db/schema";
-import {
-  GeeLarkClient,
-  geelarkEnv,
-} from "@everylab/geelark";
+import { GeeLarkClient, geelarkEnv } from "@everylab/geelark";
 
 import { adminProcedure } from "../trpc";
 
@@ -127,7 +124,7 @@ export const cloudPhoneRouter = {
       z.object({
         cloudPhoneId: z.string(),
         tiktokAccountId: z.string().uuid(),
-      })
+      }),
     )
     .mutation(async ({ ctx, input }) => {
       // Update the TikTok account with the cloud phone ID

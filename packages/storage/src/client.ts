@@ -1,16 +1,14 @@
- 
- 
- 
+import type { S3ClientConfig } from "@aws-sdk/client-s3";
 import {
   DeleteObjectCommand,
   GetObjectCommand,
   PutObjectCommand,
   S3Client,
 } from "@aws-sdk/client-s3";
-import type { S3ClientConfig } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
-import { getStorageEnv } from "./env";
+
 import type { StorageEnv } from "./env";
+import { getStorageEnv } from "./env";
 
 export interface StorageConfig {
   endpoint?: string;
@@ -70,7 +68,7 @@ export class Storage {
   async upload(
     key: string,
     data: Buffer | Uint8Array | string,
-    contentType: string
+    contentType: string,
   ): Promise<UploadResult> {
     const buffer = typeof data === "string" ? Buffer.from(data) : data;
 
@@ -100,7 +98,7 @@ export class Storage {
   async uploadVideo(
     userId: string,
     filename: string,
-    data: Buffer | Uint8Array
+    data: Buffer | Uint8Array,
   ): Promise<UploadResult> {
     const key = this.generateKey(`clips/${userId}`, filename);
     const contentType = this.getVideoContentType(filename);
@@ -113,7 +111,7 @@ export class Storage {
   async getPresignedUploadUrl(
     key: string,
     contentType: string,
-    expiresInSeconds = 3600
+    expiresInSeconds = 3600,
   ): Promise<PresignedUrlResult> {
     const command = new PutObjectCommand({
       Bucket: this.bucket,
@@ -135,7 +133,7 @@ export class Storage {
    */
   async getPresignedDownloadUrl(
     key: string,
-    expiresInSeconds = 3600
+    expiresInSeconds = 3600,
   ): Promise<PresignedUrlResult> {
     const command = new GetObjectCommand({
       Bucket: this.bucket,

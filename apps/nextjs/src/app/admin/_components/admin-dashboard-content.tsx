@@ -1,24 +1,16 @@
 "use client";
 
 import { useState } from "react";
-import {
-  Check,
-  Clock,
-  FileVideo,
-  LayoutDashboard,
-  Play,
-  Video,
-  X,
-} from "lucide-react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import Link from "next/link";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Check, Clock, LayoutDashboard, Play, Video, X } from "lucide-react";
 
 import { Button } from "@everylab/ui/button";
 
-import { useTRPC } from "~/trpc/react";
-import { Sidebar } from "~/components/sidebar";
 import type { NavItem } from "~/components/sidebar";
+import { Sidebar } from "~/components/sidebar";
 import { adminNavItems } from "~/config/navigation";
-import Link from "next/link";
+import { TRPCReactProvider, useTRPC } from "~/trpc/react";
 
 interface User {
   id: string;
@@ -38,24 +30,28 @@ function ReviewTab() {
 
   // Query for pending clips
   const { data: pendingClips = [], isLoading } = useQuery(
-    trpc.admin.pendingClips.queryOptions()
+    trpc.admin.pendingClips.queryOptions(),
   );
 
   // Mutations
   const approveClip = useMutation(
     trpc.admin.approveClip.mutationOptions({
       onSuccess: () => {
-        void queryClient.invalidateQueries({ queryKey: trpc.admin.pendingClips.queryKey() });
+        void queryClient.invalidateQueries({
+          queryKey: trpc.admin.pendingClips.queryKey(),
+        });
       },
-    })
+    }),
   );
 
   const rejectClip = useMutation(
     trpc.admin.rejectClip.mutationOptions({
       onSuccess: () => {
-        void queryClient.invalidateQueries({ queryKey: trpc.admin.pendingClips.queryKey() });
+        void queryClient.invalidateQueries({
+          queryKey: trpc.admin.pendingClips.queryKey(),
+        });
       },
-    })
+    }),
   );
 
   const handleApprove = async (clipId: string) => {
@@ -83,9 +79,12 @@ function ReviewTab() {
       {/* Summary */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-lg font-semibold text-foreground">Pending Review</h2>
-          <p className="text-sm text-muted-foreground">
-            {pendingClips.length} clip{pendingClips.length !== 1 ? "s" : ""} waiting for review
+          <h2 className="text-foreground text-lg font-semibold">
+            Pending Review
+          </h2>
+          <p className="text-muted-foreground text-sm">
+            {pendingClips.length} clip{pendingClips.length !== 1 ? "s" : ""}{" "}
+            waiting for review
           </p>
         </div>
       </div>
@@ -93,48 +92,52 @@ function ReviewTab() {
       {/* Pending Clips List */}
       <div className="space-y-4">
         {isLoading ? (
-          <div className="rounded-xl border border-border bg-card p-8 text-center">
-            <Clock className="mx-auto size-8 animate-spin text-muted-foreground" />
-            <p className="mt-4 text-muted-foreground">Loading pending clips...</p>
+          <div className="border-border bg-card rounded-xl border p-8 text-center">
+            <Clock className="text-muted-foreground mx-auto size-8 animate-spin" />
+            <p className="text-muted-foreground mt-4">
+              Loading pending clips...
+            </p>
           </div>
         ) : pendingClips.length === 0 ? (
-          <div className="rounded-xl border border-border bg-card p-8 text-center">
+          <div className="border-border bg-card rounded-xl border p-8 text-center">
             <Check className="mx-auto size-12 text-emerald-500" />
-            <p className="mt-4 text-foreground font-medium">All caught up!</p>
-            <p className="mt-1 text-muted-foreground">No clips pending review</p>
+            <p className="text-foreground mt-4 font-medium">All caught up!</p>
+            <p className="text-muted-foreground mt-1">
+              No clips pending review
+            </p>
           </div>
         ) : (
           pendingClips.map((clip) => (
             <div
               key={clip.id}
-              className="rounded-xl border border-border bg-card p-6 shadow-sm"
+              className="border-border bg-card rounded-xl border p-6 shadow-sm"
             >
               <div className="flex items-start gap-6">
                 {/* Video Preview Thumbnail */}
                 <div
                   onClick={() => setPreviewUrl(clip.videoUrl)}
-                  className="relative cursor-pointer group flex size-32 shrink-0 items-center justify-center rounded-lg bg-muted overflow-hidden"
+                  className="group bg-muted relative flex size-32 shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-lg"
                 >
-                  <Video className="size-8 text-muted-foreground" />
-                  <div className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <Video className="text-muted-foreground size-8" />
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 transition-opacity group-hover:opacity-100">
                     <Play className="size-8 text-white" />
                   </div>
                 </div>
 
                 {/* Clip Details */}
-                <div className="flex-1 min-w-0">
-                  <h3 className="text-lg font-semibold text-foreground truncate">
+                <div className="min-w-0 flex-1">
+                  <h3 className="text-foreground truncate text-lg font-semibold">
                     {clip.title}
                   </h3>
-                  <p className="mt-1 text-sm text-muted-foreground">
+                  <p className="text-muted-foreground mt-1 text-sm">
                     by {clip.user.name} ({clip.user.email})
                   </p>
                   {clip.description && (
-                    <p className="mt-2 text-sm text-foreground line-clamp-2">
+                    <p className="text-foreground mt-2 line-clamp-2 text-sm">
                       {clip.description}
                     </p>
                   )}
-                  <div className="mt-3 flex items-center gap-4 text-sm text-muted-foreground">
+                  <div className="text-muted-foreground mt-3 flex items-center gap-4 text-sm">
                     <span className="flex items-center gap-1">
                       <Clock className="size-3" />
                       {new Date(clip.createdAt).toLocaleDateString("en-US", {
@@ -146,12 +149,16 @@ function ReviewTab() {
                     {clip.scheduledAt && (
                       <span className="flex items-center gap-1">
                         <Clock className="size-3" />
-                        Scheduled: {new Date(clip.scheduledAt).toLocaleDateString("en-US", {
-                          month: "short",
-                          day: "numeric",
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
+                        Scheduled:{" "}
+                        {new Date(clip.scheduledAt).toLocaleDateString(
+                          "en-US",
+                          {
+                            month: "short",
+                            day: "numeric",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          },
+                        )}
                       </span>
                     )}
                   </div>
@@ -213,10 +220,20 @@ function ReviewTab() {
 }
 
 export function AdminDashboardContent({ user }: AdminDashboardContentProps) {
+  return (
+    <TRPCReactProvider>
+      <AdminDashboardContentInner user={user} />
+    </TRPCReactProvider>
+  );
+}
+
+function AdminDashboardContentInner({ user }: AdminDashboardContentProps) {
   const trpc = useTRPC();
 
   // Get pending count for badge
-  const { data: pendingClips = [] } = useQuery(trpc.admin.pendingClips.queryOptions());
+  const { data: pendingClips = [] } = useQuery(
+    trpc.admin.pendingClips.queryOptions(),
+  );
 
   // Add badge to Dashboard item
   const navItems: NavItem[] = adminNavItems.map((item) => {
@@ -228,12 +245,12 @@ export function AdminDashboardContent({ user }: AdminDashboardContentProps) {
 
   const bottomContent = (
     <>
-      <p className="mb-2 px-3 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+      <p className="text-muted-foreground mb-2 px-3 text-xs font-medium tracking-wider uppercase">
         Switch View
       </p>
       <Link
         href="/dashboard"
-        className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+        className="text-muted-foreground hover:bg-accent hover:text-foreground flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors"
       >
         <Video className="size-5" />
         Creator Dashboard
@@ -242,7 +259,7 @@ export function AdminDashboardContent({ user }: AdminDashboardContentProps) {
   );
 
   return (
-    <div className="flex min-h-screen bg-background">
+    <div className="bg-background flex min-h-screen">
       <Sidebar
         user={{ ...user, role: "admin" }}
         title="Admin"

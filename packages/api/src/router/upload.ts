@@ -33,14 +33,21 @@ export const uploadRouter = {
     .input(
       z.object({
         filename: z.string(),
-        fileSize: z.number().max(MAX_FILE_SIZE, `File size must be under ${MAX_FILE_SIZE / 1024 / 1024}MB`),
-      })
+        fileSize: z
+          .number()
+          .max(
+            MAX_FILE_SIZE,
+            `File size must be under ${MAX_FILE_SIZE / 1024 / 1024}MB`,
+          ),
+      }),
     )
     .mutation(async ({ ctx, input }) => {
       // Validate file extension
       const ext = input.filename.split(".").pop()?.toLowerCase();
       if (!ext || !ALLOWED_EXTENSIONS.includes(ext)) {
-        throw new Error(`Invalid file type. Allowed: ${ALLOWED_EXTENSIONS.join(", ")}`);
+        throw new Error(
+          `Invalid file type. Allowed: ${ALLOWED_EXTENSIONS.join(", ")}`,
+        );
       }
 
       const contentType = CONTENT_TYPES[ext] ?? "video/mp4";
@@ -56,7 +63,7 @@ export const uploadRouter = {
       const { url, expiresAt } = await storage.getPresignedUploadUrl(
         key,
         contentType,
-        3600 // 1 hour expiry
+        3600, // 1 hour expiry
       );
 
       // Get public URL for after upload

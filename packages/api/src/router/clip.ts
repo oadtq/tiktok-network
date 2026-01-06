@@ -20,6 +20,36 @@ import { protectedProcedure } from "../trpc";
 // Valid clip status values
 const clipStatusValues = clipStatusEnum.enumValues;
 
+function extractStorageKeyFromPublicUrl(args: {
+  storage: ReturnType<typeof createStorageFromEnv>;
+  publicUrl: string;
+}): string | null {
+  const probeKey = "__probe_key__";
+  const probeUrl = new URL(args.storage.getPublicUrl(probeKey));
+  // Remove the probeKey segment to get the base path prefix used by getPublicUrl()
+  probeUrl.pathname = probeUrl.pathname.replace(/\/__probe_key__$/, "");
+
+  let candidate: URL;
+  try {
+    candidate = new URL(args.publicUrl);
+  } catch {
+    return null;
+  }
+
+  if (candidate.origin !== probeUrl.origin) return null;
+  if (!candidate.pathname.startsWith(probeUrl.pathname)) return null;
+
+  let key = candidate.pathname.slice(probeUrl.pathname.length);
+  if (key.startsWith("/")) key = key.slice(1);
+  if (!key) return null;
+
+  try {
+    return decodeURIComponent(key);
+  } catch {
+    return key;
+  }
+}
+
 // Get video content type from filename
 function getVideoContentType(filename: string): string {
   const ext = filename.split(".").pop()?.toLowerCase();
@@ -41,18 +71,27 @@ export const clipRouter = {
     .input(
       z.object({
         filename: z.string().min(1),
-      })
+      }),
     )
     .mutation(async ({ ctx, input }) => {
       const storage = createStorageFromEnv();
-      const key = storage.generateKey(`clips/${ctx.session.user.id}`, input.filename);
+      const key = storage.generateKey(
+        `clips/${ctx.session.user.id}`,
+        input.filename,
+      );
       const contentType = getVideoContentType(input.filename);
-      
-      const result = await storage.getPresignedUploadUrl(key, contentType, 3600);
+
+      const result = await storage.getPresignedUploadUrl(
+        key,
+        contentType,
+        3600,
+      );
       const publicUrl = storage.getPublicUrl(key);
-      
-      console.log(`[Clip] Generated presigned upload URL for user ${ctx.session.user.id}, key: ${key}`);
-      
+
+      console.log(
+        `[Clip] Generated presigned upload URL for user ${ctx.session.user.id}, key: ${key}`,
+      );
+
       return {
         uploadUrl: result.url,
         key,
@@ -66,13 +105,18 @@ export const clipRouter = {
    */
   list: protectedProcedure
     .input(
-      z.object({
-        status: z.enum(clipStatusValues).optional(),
-      }).optional()
+      z
+        .object({
+          status: z.enum(clipStatusValues).optional(),
+        })
+        .optional(),
     )
     .query(async ({ ctx, input }) => {
       const whereClause = input?.status
-        ? and(eq(clip.userId, ctx.session.user.id), eq(clip.status, input.status))
+        ? and(
+            eq(clip.userId, ctx.session.user.id),
+            eq(clip.status, input.status),
+          )
         : eq(clip.userId, ctx.session.user.id);
 
       const clips = await ctx.db.query.clip.findMany({
@@ -95,7 +139,7 @@ export const clipRouter = {
     }),
 
   /**
-   * Withdraw a submitted clip back to draft status
+   * Withdraw a pending clip back to draft status
    */
   withdraw: protectedProcedure
     .input(z.object({ id: z.string().uuid() }))
@@ -109,8 +153,8 @@ export const clipRouter = {
         throw new Error("Clip not found or access denied");
       }
 
-      if (existing.status !== "submitted") {
-        throw new Error("Only submitted clips can be withdrawn");
+      if (existing.status !== "pending") {
+        throw new Error("Only pending clips can be withdrawn");
       }
 
       const [updated] = await ctx.db
@@ -150,7 +194,7 @@ export const clipRouter = {
     }),
 
   /**
-   * Create a new clip and submit for review
+   * Create a new clip (draft)
    */
   create: protectedProcedure
     .input(
@@ -159,7 +203,7 @@ export const clipRouter = {
         description: z.string().optional(),
         videoUrl: z.url(),
         scheduledAt: z.date().optional(),
-      })
+      }),
     )
     .mutation(async ({ ctx, input }) => {
       const [newClip] = await ctx.db
@@ -170,11 +214,13 @@ export const clipRouter = {
           videoUrl: input.videoUrl,
           scheduledAt: input.scheduledAt,
           userId: ctx.session.user.id,
-          status: "submitted", // Auto-submit for review
+          status: "draft",
         })
         .returning();
 
-      console.log(`[Clip] Created clip ${newClip?.id} for user ${ctx.session.user.id}, status: submitted`);
+      console.log(
+        `[Clip] Created clip ${newClip?.id} for user ${ctx.session.user.id}, status: draft`,
+      );
 
       return newClip;
     }),
@@ -194,9 +240,35 @@ export const clipRouter = {
         throw new Error("Clip not found or access denied");
       }
 
+      // Allow idempotent submit (no-op) for already pending clips
+      if (existing.status === "pending") {
+        return existing;
+      }
+
+      if (existing.status !== "draft") {
+        throw new Error("Only draft clips can be submitted for review");
+      }
+
+      if (!existing.description?.trim()) {
+        throw new Error("Add a caption before submitting for review");
+      }
+
+      if (!existing.tiktokAccountId) {
+        throw new Error("Select a TikTok account before submitting for review");
+      }
+
+      if (!existing.scheduledAt) {
+        throw new Error("Select a publish time before submitting for review");
+      }
+
+      const minPublishAtMs = Date.now() + 60_000;
+      if (existing.scheduledAt.getTime() < minPublishAtMs) {
+        throw new Error("Publish time must be at least 1 minute in the future");
+      }
+
       const [updated] = await ctx.db
         .update(clip)
-        .set({ status: "submitted" })
+        .set({ status: "pending" })
         .where(eq(clip.id, input.id))
         .returning();
 
@@ -211,7 +283,7 @@ export const clipRouter = {
       z.object({
         id: z.string().uuid(),
         data: UpdateClipSchema,
-      })
+      }),
     )
     .mutation(async ({ ctx, input }) => {
       // Verify ownership
@@ -247,6 +319,34 @@ export const clipRouter = {
         throw new Error("Clip not found or access denied");
       }
 
+      // Best-effort: delete underlying objects from S3 first so user can retry if it fails.
+      // (DeleteObject on S3 is idempotent; deleting a missing object is still "ok".)
+      const storage = createStorageFromEnv();
+      const expectedPrefix = `clips/${ctx.session.user.id}/`;
+
+      const videoKey = extractStorageKeyFromPublicUrl({
+        storage,
+        publicUrl: existing.videoUrl,
+      });
+      if (videoKey?.startsWith(expectedPrefix)) {
+        await storage.delete(videoKey);
+      } else {
+        console.warn(
+          `[Clip] Skipping S3 delete for clip ${existing.id}: could not derive safe key from videoUrl`,
+          { videoUrl: existing.videoUrl, derivedKey: videoKey },
+        );
+      }
+
+      if (existing.thumbnailUrl) {
+        const thumbKey = extractStorageKeyFromPublicUrl({
+          storage,
+          publicUrl: existing.thumbnailUrl,
+        });
+        if (thumbKey?.startsWith(expectedPrefix)) {
+          await storage.delete(thumbKey);
+        }
+      }
+
       await ctx.db.delete(clip).where(eq(clip.id, input.id));
       return { success: true };
     }),
@@ -260,7 +360,7 @@ export const clipRouter = {
         id: z.string().uuid(),
         scheduledAt: z.date(),
         tiktokAccountId: z.string().uuid(),
-      })
+      }),
     )
     .mutation(async ({ ctx, input }) => {
       // Verify ownership

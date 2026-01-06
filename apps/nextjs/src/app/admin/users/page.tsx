@@ -1,7 +1,6 @@
 import { redirect } from "next/navigation";
 
 import { getSession } from "~/auth/server";
-
 import { UsersContent } from "./_components/users-content";
 
 export default async function UsersPage() {

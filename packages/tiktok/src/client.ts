@@ -64,10 +64,7 @@ export class TikTokClient {
    */
   private base64UrlEncode(buffer: Uint8Array): string {
     const base64 = btoa(String.fromCharCode(...buffer));
-    return base64
-      .replace(/\+/g, "-")
-      .replace(/\//g, "_")
-      .replace(/=/g, "");
+    return base64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "");
   }
 
   // ============================================================================
@@ -82,7 +79,7 @@ export class TikTokClient {
   async getAuthorizationUrl(
     redirectUri: string,
     state: string,
-    scopes: TikTokScope[] = DEFAULT_SCOPES
+    scopes: TikTokScope[] = DEFAULT_SCOPES,
   ): Promise<{ url: string; codeVerifier: string }> {
     // Generate PKCE parameters
     const codeVerifier = this.generateCodeVerifier();
@@ -106,7 +103,7 @@ export class TikTokClient {
     });
 
     const url = `${TIKTOK_AUTH_URL}?${params.toString()}`;
-    
+
     console.log("[TikTok] Generated OAuth URL:");
     console.log("  - Full URL:", url);
 
@@ -122,7 +119,7 @@ export class TikTokClient {
   async exchangeCodeForToken(
     code: string,
     redirectUri: string,
-    codeVerifier: string
+    codeVerifier: string,
   ): Promise<StoredToken> {
     console.log("[TikTok] Exchanging authorization code for token...");
 
@@ -208,7 +205,7 @@ export class TikTokClient {
       const errorText = await response.text();
       console.error("[TikTok] Token revocation failed:", errorText);
       throw new Error(
-        `Token revocation failed: ${response.status} ${errorText}`
+        `Token revocation failed: ${response.status} ${errorText}`,
       );
     }
 
@@ -222,7 +219,7 @@ export class TikTokClient {
       refreshToken: data.refresh_token,
       expiresAt: new Date(now.getTime() + data.expires_in * 1000),
       refreshExpiresAt: new Date(
-        now.getTime() + data.refresh_expires_in * 1000
+        now.getTime() + data.refresh_expires_in * 1000,
       ),
       openId: data.open_id,
       scope: data.scope,
@@ -262,14 +259,14 @@ export class TikTokClient {
         headers: {
           Authorization: `Bearer ${accessToken}`,
         },
-      }
+      },
     );
 
     if (!response.ok) {
       const errorText = await response.text();
       console.error("[TikTok] User info fetch failed:", errorText);
       throw new Error(
-        `User info fetch failed: ${response.status} ${errorText}`
+        `User info fetch failed: ${response.status} ${errorText}`,
       );
     }
 
@@ -281,7 +278,7 @@ export class TikTokClient {
 
     console.log(
       "[TikTok] User info fetched successfully:",
-      data.data.user.display_name
+      data.data.user.display_name,
     );
 
     return data.data.user;
@@ -299,7 +296,7 @@ export class TikTokClient {
     options: {
       cursor?: number;
       maxCount?: number;
-    } = {}
+    } = {},
   ): Promise<{ videos: TikTokVideo[]; cursor: number; hasMore: boolean }> {
     console.log("[TikTok] Fetching video list...");
 
@@ -338,14 +335,14 @@ export class TikTokClient {
           "Content-Type": "application/json",
         },
         body: JSON.stringify(body),
-      }
+      },
     );
 
     if (!response.ok) {
       const errorText = await response.text();
       console.error("[TikTok] Video list fetch failed:", errorText);
       throw new Error(
-        `Video list fetch failed: ${response.status} ${errorText}`
+        `Video list fetch failed: ${response.status} ${errorText}`,
       );
     }
 
@@ -359,7 +356,7 @@ export class TikTokClient {
       "[TikTok] Fetched",
       data.data.videos.length,
       "videos, hasMore:",
-      data.data.has_more
+      data.data.has_more,
     );
 
     return {
@@ -374,7 +371,7 @@ export class TikTokClient {
    */
   async queryVideos(
     accessToken: string,
-    videoIds: string[]
+    videoIds: string[],
   ): Promise<TikTokVideo[]> {
     console.log("[TikTok] Querying videos by IDs:", videoIds);
 
@@ -405,7 +402,7 @@ export class TikTokClient {
             video_ids: videoIds,
           },
         }),
-      }
+      },
     );
 
     if (!response.ok) {

@@ -1,7 +1,6 @@
 import { redirect } from "next/navigation";
 
 import { getSession } from "~/auth/server";
-
 import { AdminDashboardContent } from "./_components/admin-dashboard-content";
 
 export default async function AdminPage() {

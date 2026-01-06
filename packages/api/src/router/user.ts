@@ -7,7 +7,7 @@ import type { TRPCRouterRecord } from "@trpc/server";
 import { z } from "zod/v4";
 
 import { and, desc, eq } from "@everylab/db";
-import { user, userTiktokAccount, tiktokAccount } from "@everylab/db/schema";
+import { tiktokAccount, user, userTiktokAccount } from "@everylab/db/schema";
 
 import { adminProcedure } from "../trpc";
 
@@ -90,14 +90,14 @@ export const userRouter = {
       z.object({
         userId: z.string(),
         tiktokAccountId: z.string().uuid(),
-      })
+      }),
     )
     .mutation(async ({ ctx, input }) => {
       // Check if link already exists
       const existing = await ctx.db.query.userTiktokAccount.findFirst({
         where: and(
           eq(userTiktokAccount.userId, input.userId),
-          eq(userTiktokAccount.tiktokAccountId, input.tiktokAccountId)
+          eq(userTiktokAccount.tiktokAccountId, input.tiktokAccountId),
         ),
       });
 
@@ -124,7 +124,7 @@ export const userRouter = {
       z.object({
         userId: z.string(),
         tiktokAccountId: z.string().uuid(),
-      })
+      }),
     )
     .mutation(async ({ ctx, input }) => {
       await ctx.db
@@ -132,8 +132,8 @@ export const userRouter = {
         .where(
           and(
             eq(userTiktokAccount.userId, input.userId),
-            eq(userTiktokAccount.tiktokAccountId, input.tiktokAccountId)
-          )
+            eq(userTiktokAccount.tiktokAccountId, input.tiktokAccountId),
+          ),
         );
 
       return { success: true };
@@ -150,7 +150,9 @@ export const userRouter = {
         where: eq(userTiktokAccount.userId, input.userId),
       });
 
-      const linkedAccountIds = new Set(existingLinks.map((l) => l.tiktokAccountId));
+      const linkedAccountIds = new Set(
+        existingLinks.map((l) => l.tiktokAccountId),
+      );
 
       // Get all active accounts
       const allAccounts = await ctx.db.query.tiktokAccount.findMany({

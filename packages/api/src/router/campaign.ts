@@ -42,7 +42,7 @@ export const campaignRouter = {
     return campaigns.map((c) => {
       const totalClips = c.campaignClips.length;
       const uniqueCreators = new Set(
-        c.campaignClips.map((cc) => cc.clip.userId)
+        c.campaignClips.map((cc) => cc.clip.userId),
       ).size;
 
       return {
@@ -101,7 +101,7 @@ export const campaignRouter = {
       z.object({
         id: z.string().uuid(),
         data: UpdateCampaignSchema,
-      })
+      }),
     )
     .mutation(async ({ ctx, input }) => {
       const [updated] = await ctx.db
@@ -131,7 +131,7 @@ export const campaignRouter = {
       z.object({
         campaignId: z.string().uuid(),
         clipIds: z.array(z.string().uuid()),
-      })
+      }),
     )
     .mutation(async ({ ctx, input }) => {
       const values = input.clipIds.map((clipId) => ({
@@ -151,13 +151,13 @@ export const campaignRouter = {
       z.object({
         campaignId: z.string().uuid(),
         clipId: z.string().uuid(),
-      })
+      }),
     )
     .mutation(async ({ ctx, input }) => {
       await ctx.db
         .delete(campaignClip)
         .where(
-          sql`${campaignClip.campaignId} = ${input.campaignId} AND ${campaignClip.clipId} = ${input.clipId}`
+          sql`${campaignClip.campaignId} = ${input.campaignId} AND ${campaignClip.clipId} = ${input.clipId}`,
         );
       return { success: true };
     }),
@@ -179,13 +179,16 @@ export const campaignRouter = {
     });
 
     // Extract unique campaigns with type-safe map
-    const campaignsMap = new Map<string, {
-      id: string;
-      name: string;
-      description: string | null;
-      status: string;
-      myClipsCount: number;
-    }>();
+    const campaignsMap = new Map<
+      string,
+      {
+        id: string;
+        name: string;
+        description: string | null;
+        status: string;
+        myClipsCount: number;
+      }
+    >();
 
     for (const c of userClips) {
       for (const cc of c.campaignClips) {

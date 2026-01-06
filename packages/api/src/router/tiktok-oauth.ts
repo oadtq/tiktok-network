@@ -20,7 +20,7 @@ import { adminProcedure } from "../trpc";
 function getTikTokClient() {
   if (!isTikTokConfigured()) {
     throw new Error(
-      "TikTok API is not configured. Please set TIKTOK_CLIENT_KEY and TIKTOK_CLIENT_SECRET environment variables."
+      "TikTok API is not configured. Please set TIKTOK_CLIENT_KEY and TIKTOK_CLIENT_SECRET environment variables.",
     );
   }
   return createTikTokClient({
@@ -48,16 +48,18 @@ export const tiktokOAuthRouter = {
       z.object({
         redirectUri: z.string().url(),
         state: z.string().optional(),
-      })
+      }),
     )
     .mutation(async ({ input }) => {
       const client = getTikTokClient();
 
       // Generate a random state if not provided
-      const state =
-        input.state ?? Math.random().toString(36).substring(2, 15);
+      const state = input.state ?? Math.random().toString(36).substring(2, 15);
 
-      const { url: authUrl, codeVerifier } = await client.getAuthorizationUrl(input.redirectUri, state);
+      const { url: authUrl, codeVerifier } = await client.getAuthorizationUrl(
+        input.redirectUri,
+        state,
+      );
 
       console.log("[TikTok OAuth] Generated auth URL, state:", state);
 
@@ -77,7 +79,7 @@ export const tiktokOAuthRouter = {
         code: z.string(),
         redirectUri: z.string().url(),
         codeVerifier: z.string(),
-      })
+      }),
     )
     .mutation(async ({ ctx, input }) => {
       const client = getTikTokClient();
@@ -88,21 +90,15 @@ export const tiktokOAuthRouter = {
       const tokenData = await client.exchangeCodeForToken(
         input.code,
         input.redirectUri,
-        input.codeVerifier
+        input.codeVerifier,
       );
 
-      console.log(
-        "[TikTok OAuth] Token received, openId:",
-        tokenData.openId
-      );
+      console.log("[TikTok OAuth] Token received, openId:", tokenData.openId);
 
       // Get user info from TikTok
       const userInfo = await client.getUserInfo(tokenData.accessToken);
 
-      console.log(
-        "[TikTok OAuth] User info received:",
-        userInfo.display_name
-      );
+      console.log("[TikTok OAuth] User info received:", userInfo.display_name);
 
       // Check if account already exists
       const existingAccount = await ctx.db.query.tiktokAccount.findFirst({
@@ -113,7 +109,7 @@ export const tiktokOAuthRouter = {
         // Update existing account with new tokens
         console.log(
           "[TikTok OAuth] Updating existing account:",
-          existingAccount.id
+          existingAccount.id,
         );
 
         const [updatedAccount] = await ctx.db
@@ -136,13 +132,18 @@ export const tiktokOAuthRouter = {
       }
 
       // Create new account
-      console.log("[TikTok OAuth] Creating new account for:", userInfo.display_name);
+      console.log(
+        "[TikTok OAuth] Creating new account for:",
+        userInfo.display_name,
+      );
 
       const [newAccount] = await ctx.db
         .insert(tiktokAccount)
         .values({
           name: userInfo.display_name,
-          tiktokUsername: userInfo.display_name.replace(/\s+/g, "_").toLowerCase(),
+          tiktokUsername: userInfo.display_name
+            .replace(/\s+/g, "_")
+            .toLowerCase(),
           tiktokUserId: tokenData.openId,
           accessToken: tokenData.accessToken,
           refreshToken: tokenData.refreshToken,
@@ -182,7 +183,9 @@ export const tiktokOAuthRouter = {
 
       console.log("[TikTok OAuth] Refreshing token for account:", account.id);
 
-      const newTokenData = await client.refreshAccessToken(account.refreshToken);
+      const newTokenData = await client.refreshAccessToken(
+        account.refreshToken,
+      );
 
       const [updatedAccount] = await ctx.db
         .update(tiktokAccount)
@@ -269,7 +272,9 @@ export const tiktokOAuthRouter = {
           throw new Error("Token expired and no refresh token available");
         }
 
-        const newTokenData = await client.refreshAccessToken(account.refreshToken);
+        const newTokenData = await client.refreshAccessToken(
+          account.refreshToken,
+        );
 
         await ctx.db
           .update(tiktokAccount)
@@ -313,7 +318,7 @@ export const tiktokOAuthRouter = {
       try {
         console.log("[TikTok OAuth] Syncing videos for account:", account.id);
         const videoData = await client.getVideoList(account.accessToken);
-        
+
         console.log(`[TikTok OAuth] Found ${videoData.videos.length} videos`);
 
         for (const video of videoData.videos) {
@@ -329,7 +334,8 @@ export const tiktokOAuthRouter = {
             await ctx.db
               .update(clip)
               .set({
-                title: video.title || video.video_description || "Untitled TikTok",
+                title:
+                  video.title ?? video.video_description ?? "Untitled TikTok",
                 description: video.video_description,
                 thumbnailUrl: video.cover_image_url,
                 tiktokVideoUrl: video.share_url,
@@ -347,9 +353,10 @@ export const tiktokOAuthRouter = {
               .values({
                 userId: ctx.session.user.id,
                 tiktokAccountId: account.id,
-                title: video.title || video.video_description || "Untitled TikTok",
+                title:
+                  video.title ?? video.video_description ?? "Untitled TikTok",
                 description: video.video_description,
-                videoUrl: video.share_url || "", // We don't have the raw video URL, using share URL as placeholder
+                videoUrl: video.share_url ?? "", // We don't have the raw video URL, using share URL as placeholder
                 thumbnailUrl: video.cover_image_url,
                 tiktokVideoId: video.id,
                 tiktokVideoUrl: video.share_url,
@@ -358,7 +365,7 @@ export const tiktokOAuthRouter = {
                 status: "published",
               })
               .returning();
-            
+
             clipId = newClip?.id;
           }
 
@@ -373,7 +380,7 @@ export const tiktokOAuthRouter = {
             });
           }
         }
-        
+
         console.log("[TikTok OAuth] Videos synced successfully");
       } catch (error) {
         console.error("[TikTok OAuth] Failed to sync videos:", error);

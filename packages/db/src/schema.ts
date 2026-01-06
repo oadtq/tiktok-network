@@ -3,16 +3,17 @@ import { pgEnum, pgTable } from "drizzle-orm/pg-core";
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
+// Import auth tables to extend with relations
+import { user as authUser } from "./auth-schema";
+
 // ============================================================================
 // ENUMS
 // ============================================================================
 
 export const clipStatusEnum = pgEnum("clip_status", [
-  "draft", // Draft, not ready for review
-  "submitted", // Submitted for review
-  "approved", // Approved and scheduled for publishing
-  "rejected", // Rejected by admin
-  "publishing", // Currently being published
+  "draft", // Uploaded, not yet submitted
+  "pending", // Awaiting admin approval (was "submitted")
+  "approved", // Approved, publishing in progress
   "published", // Successfully published to TikTok
   "failed", // Publishing failed
 ]);
@@ -30,9 +31,6 @@ export const campaignStatusEnum = pgEnum("campaign_status", [
 
 export * from "./auth-schema";
 
-// Import auth tables to extend with relations
-import { user as authUser } from "./auth-schema";
-
 // ============================================================================
 // CLOUD PHONES (cached from GeeLark API)
 // ============================================================================
@@ -46,7 +44,10 @@ export const cloudPhone = pgTable("cloud_phone", (t) => ({
   proxyPort: t.integer(),
   countryName: t.varchar({ length: 256 }),
   lastSyncedAt: t.timestamp({ mode: "date", withTimezone: true }).defaultNow(),
-  createdAt: t.timestamp({ mode: "date", withTimezone: true }).defaultNow().notNull(),
+  createdAt: t
+    .timestamp({ mode: "date", withTimezone: true })
+    .defaultNow()
+    .notNull(),
   updatedAt: t
     .timestamp({ mode: "date", withTimezone: true })
     .$onUpdateFn(() => new Date()),
@@ -73,20 +74,26 @@ export const tiktokAccount = pgTable("tiktok_account", (t) => ({
   tokenExpiresAt: t.timestamp({ mode: "date", withTimezone: true }),
   followerCount: t.integer().default(0),
   isActive: t.boolean().default(true).notNull(),
-  createdAt: t.timestamp({ mode: "date", withTimezone: true }).defaultNow().notNull(),
+  createdAt: t
+    .timestamp({ mode: "date", withTimezone: true })
+    .defaultNow()
+    .notNull(),
   updatedAt: t
     .timestamp({ mode: "date", withTimezone: true })
     .$onUpdateFn(() => new Date()),
 }));
 
-export const tiktokAccountRelations = relations(tiktokAccount, ({ one, many }) => ({
-  cloudPhone: one(cloudPhone, {
-    fields: [tiktokAccount.cloudPhoneId],
-    references: [cloudPhone.id],
+export const tiktokAccountRelations = relations(
+  tiktokAccount,
+  ({ one, many }) => ({
+    cloudPhone: one(cloudPhone, {
+      fields: [tiktokAccount.cloudPhoneId],
+      references: [cloudPhone.id],
+    }),
+    clips: many(clip),
+    userTiktokAccounts: many(userTiktokAccount),
   }),
-  clips: many(clip),
-  userTiktokAccounts: many(userTiktokAccount),
-}));
+);
 
 // ============================================================================
 // CLIPS (user-uploaded content)
@@ -116,7 +123,10 @@ export const clip = pgTable("clip", (t) => ({
   tiktokVideoUrl: t.text(), // URL to the published TikTok
   geelarkTaskId: t.varchar({ length: 256 }), // GeeLark task ID for tracking publish job
   // Metadata
-  createdAt: t.timestamp({ mode: "date", withTimezone: true }).defaultNow().notNull(),
+  createdAt: t
+    .timestamp({ mode: "date", withTimezone: true })
+    .defaultNow()
+    .notNull(),
   updatedAt: t
     .timestamp({ mode: "date", withTimezone: true })
     .$onUpdateFn(() => new Date()),
@@ -151,7 +161,10 @@ export const clipStats = pgTable("clip_stats", (t) => ({
   comments: t.integer().default(0).notNull(),
   shares: t.integer().default(0).notNull(),
   // Timestamp for this snapshot
-  recordedAt: t.timestamp({ mode: "date", withTimezone: true }).defaultNow().notNull(),
+  recordedAt: t
+    .timestamp({ mode: "date", withTimezone: true })
+    .defaultNow()
+    .notNull(),
 }));
 
 export const clipStatsRelations = relations(clipStats, ({ one }) => ({
@@ -174,7 +187,10 @@ export const campaign = pgTable("campaign", (t) => ({
   startDate: t.timestamp({ mode: "date", withTimezone: true }),
   endDate: t.timestamp({ mode: "date", withTimezone: true }),
   // Metadata
-  createdAt: t.timestamp({ mode: "date", withTimezone: true }).defaultNow().notNull(),
+  createdAt: t
+    .timestamp({ mode: "date", withTimezone: true })
+    .defaultNow()
+    .notNull(),
   updatedAt: t
     .timestamp({ mode: "date", withTimezone: true })
     .$onUpdateFn(() => new Date()),
@@ -199,7 +215,10 @@ export const campaignClip = pgTable("campaign_clip", (t) => ({
     .notNull()
     .references(() => clip.id, { onDelete: "cascade" }),
   // Metadata
-  createdAt: t.timestamp({ mode: "date", withTimezone: true }).defaultNow().notNull(),
+  createdAt: t
+    .timestamp({ mode: "date", withTimezone: true })
+    .defaultNow()
+    .notNull(),
 }));
 
 export const campaignClipRelations = relations(campaignClip, ({ one }) => ({
@@ -227,17 +246,71 @@ export const userTiktokAccount = pgTable("user_tiktok_account", (t) => ({
     .uuid()
     .notNull()
     .references(() => tiktokAccount.id, { onDelete: "cascade" }),
-  createdAt: t.timestamp({ mode: "date", withTimezone: true }).defaultNow().notNull(),
+  createdAt: t
+    .timestamp({ mode: "date", withTimezone: true })
+    .defaultNow()
+    .notNull(),
 }));
 
-export const userTiktokAccountRelations = relations(userTiktokAccount, ({ one }) => ({
-  user: one(authUser, {
-    fields: [userTiktokAccount.userId],
-    references: [authUser.id],
+export const userTiktokAccountRelations = relations(
+  userTiktokAccount,
+  ({ one }) => ({
+    user: one(authUser, {
+      fields: [userTiktokAccount.userId],
+      references: [authUser.id],
+    }),
+    tiktokAccount: one(tiktokAccount, {
+      fields: [userTiktokAccount.tiktokAccountId],
+      references: [tiktokAccount.id],
+    }),
   }),
-  tiktokAccount: one(tiktokAccount, {
-    fields: [userTiktokAccount.tiktokAccountId],
-    references: [tiktokAccount.id],
+);
+
+// ============================================================================
+// GEELARK TASKS (cached from GeeLark API)
+// ============================================================================
+
+export const geelarkTaskStatusEnum = pgEnum("geelark_task_status", [
+  "waiting", // 1 - Waiting
+  "in_progress", // 2 - In progress
+  "completed", // 3 - Completed
+  "failed", // 4 - Failed
+  "cancelled", // 7 - Cancelled
+]);
+
+export const geelarkTask = pgTable("geelark_task", (t) => ({
+  id: t.varchar({ length: 256 }).notNull().primaryKey(), // GeeLark task ID
+  planName: t.varchar({ length: 256 }),
+  taskType: t.integer().notNull(), // 1=video, 2=warmup, 3=carousel, 4=login, 6=profile, 42=custom
+  cloudPhoneId: t
+    .varchar({ length: 256 })
+    .references(() => cloudPhone.id, { onDelete: "set null" }),
+  serialName: t.varchar({ length: 256 }),
+  scheduleAt: t.timestamp({ mode: "date", withTimezone: true }),
+  status: geelarkTaskStatusEnum("status").notNull(),
+  failCode: t.integer(),
+  failDesc: t.text(),
+  cost: t.integer(), // seconds taken
+  shareLink: t.text(),
+  clipId: t.uuid().references(() => clip.id, { onDelete: "set null" }), // Link to our clip if applicable
+  lastSyncedAt: t
+    .timestamp({ mode: "date", withTimezone: true })
+    .defaultNow()
+    .notNull(),
+  createdAt: t
+    .timestamp({ mode: "date", withTimezone: true })
+    .defaultNow()
+    .notNull(),
+}));
+
+export const geelarkTaskRelations = relations(geelarkTask, ({ one }) => ({
+  cloudPhone: one(cloudPhone, {
+    fields: [geelarkTask.cloudPhoneId],
+    references: [cloudPhone.id],
+  }),
+  clip: one(clip, {
+    fields: [geelarkTask.clipId],
+    references: [clip.id],
   }),
 }));
 

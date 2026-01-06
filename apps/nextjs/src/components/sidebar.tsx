@@ -71,11 +71,11 @@ export function Sidebar({
   const pathname = usePathname();
 
   return (
-    <aside className="sticky top-0 flex h-screen w-64 shrink-0 flex-col border-r border-border bg-sidebar">
+    <aside className="border-border bg-sidebar sticky top-0 flex h-screen w-64 shrink-0 flex-col border-r">
       {/* Logo */}
-      <div className="flex h-16 items-center gap-3 border-b border-border px-6">
-        <div className="flex size-8 items-center justify-center rounded-lg bg-primary">
-          <LogoIcon className="size-4 text-primary-foreground" />
+      <div className="border-border flex h-16 items-center gap-3 border-b px-6">
+        <div className="bg-primary flex size-8 items-center justify-center rounded-lg">
+          <LogoIcon className="text-primary-foreground size-4" />
         </div>
         <span className="text-lg font-semibold tracking-tight">{title}</span>
       </div>
@@ -92,23 +92,23 @@ export function Sidebar({
 
         {bottomContent && (
           <>
-            <div className="my-4 border-t border-border" />
+            <div className="border-border my-4 border-t" />
             {bottomContent}
           </>
         )}
       </nav>
 
       {/* User Profile */}
-      <div className="border-t border-border p-4">
+      <div className="border-border border-t p-4">
         <div className="flex items-center gap-3">
           <div className="flex size-9 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 text-sm font-medium text-white">
             {user.name.charAt(0).toUpperCase()}
           </div>
           <div className="flex-1 overflow-hidden">
-            <p className="truncate text-sm font-medium text-foreground">
+            <p className="text-foreground truncate text-sm font-medium">
               {user.name}
             </p>
-            <p className="truncate text-xs text-muted-foreground">
+            <p className="text-muted-foreground truncate text-xs">
               {user.role === "admin" ? "Admin" : user.email}
             </p>
           </div>
@@ -118,7 +118,7 @@ export function Sidebar({
                 window.location.href = "/";
               });
             }}
-            className="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+            className="text-muted-foreground hover:bg-accent hover:text-foreground rounded-lg p-2 transition-colors"
             title="Sign out"
           >
             <LogOut className="size-4" />
