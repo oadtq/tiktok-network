@@ -3,13 +3,13 @@
 import { useState } from "react";
 import Link from "next/link";
 import {
-  Bookmark,
   ChevronDown,
   Clock,
   Eye,
   Heart,
   LayoutDashboard,
   MessageCircle,
+  Share2,
   Video,
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
@@ -156,13 +156,13 @@ export function AdminStatisticsContent({ user }: AdminStatisticsContentProps) {
         totalViews: allClipsStats?.totalViews ?? 0,
         totalLikes: allClipsStats?.totalLikes ?? 0,
         totalComments: allClipsStats?.totalComments ?? 0,
-        totalSaved: allClipsStats?.totalShares ?? 0,
+        totalShares: allClipsStats?.totalShares ?? 0,
       }
     : {
         totalViews: userStats?.totalViews ?? 0,
         totalLikes: userStats?.totalLikes ?? 0,
         totalComments: userStats?.totalComments ?? 0,
-        totalSaved: userStats?.totalShares ?? 0,
+        totalShares: userStats?.totalShares ?? 0,
       };
 
   const clips = selectedUserId === "all" 
@@ -274,7 +274,7 @@ export function AdminStatisticsContent({ user }: AdminStatisticsContentProps) {
             <StatCard title="Total Views" value={stats.totalViews} icon={Eye} accentColor="#3b82f6" />
             <StatCard title="Total Likes" value={stats.totalLikes} icon={Heart} accentColor="#ec4899" />
             <StatCard title="Total Comments" value={stats.totalComments} icon={MessageCircle} accentColor="#10b981" />
-            <StatCard title="Total Saved" value={stats.totalSaved} icon={Bookmark} accentColor="#f59e0b" />
+            <StatCard title="Total Shares" value={stats.totalShares} icon={Share2} accentColor="#f59e0b" />
           </div>
 
           {/* Clips Stats Table */}
@@ -317,19 +317,25 @@ export function AdminStatisticsContent({ user }: AdminStatisticsContentProps) {
                         Comments
                       </div>
                     </th>
+                    <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                      <div className="flex items-center justify-end gap-1">
+                        <Share2 className="size-3" />
+                        Shares
+                      </div>
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
                   {isLoadingAllStats && selectedUserId === "all" ? (
                     <tr>
-                      <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">
+                      <td colSpan={7} className="px-4 py-8 text-center text-muted-foreground">
                         <Clock className="mx-auto size-6 animate-spin text-muted-foreground" />
                         <p className="mt-2">Loading clips...</p>
                       </td>
                     </tr>
                   ) : clips.length === 0 ? (
                     <tr>
-                      <td colSpan={selectedUserId === "all" ? 6 : 5} className="px-4 py-8 text-center text-muted-foreground">
+                      <td colSpan={selectedUserId === "all" ? 7 : 6} className="px-4 py-8 text-center text-muted-foreground">
                         No clips found {timeRange !== "all" && "for this time range"}
                       </td>
                     </tr>
@@ -363,6 +369,9 @@ export function AdminStatisticsContent({ user }: AdminStatisticsContentProps) {
                         </td>
                         <td className="px-4 py-3 text-right tabular-nums text-foreground">
                           {(clip.latestStats?.comments ?? 0).toLocaleString()}
+                        </td>
+                        <td className="px-4 py-3 text-right tabular-nums text-foreground">
+                          {(clip.latestStats?.shares ?? 0).toLocaleString()}
                         </td>
                       </tr>
                     ))

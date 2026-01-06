@@ -59,7 +59,9 @@
     "AWS_REGION",
     "S3_PUBLIC_URL",
     "TIKTOK_CLIENT_KEY",
-    "TIKTOK_CLIENT_SECRET"
+    "TIKTOK_CLIENT_SECRET",
+    "GEELARK_APP_ID",
+    "GEELARK_API_KEY"
   ],
   "globalPassThroughEnv": [
     "NODE_ENV",
