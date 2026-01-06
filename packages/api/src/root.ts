@@ -3,6 +3,7 @@ import { authRouter } from "./router/auth";
 import { campaignRouter } from "./router/campaign";
 import { clipRouter } from "./router/clip";
 import { cloudPhoneRouter } from "./router/cloudphone";
+import { proxyRouter } from "./router/proxy";
 import { tiktokAccountRouter } from "./router/tiktok-account";
 import { tiktokOAuthRouter } from "./router/tiktok-oauth";
 import { tiktokStatsRouter } from "./router/tiktok-stats";
@@ -22,6 +23,7 @@ export const appRouter = createTRPCRouter({
   admin: adminRouter,
   campaign: campaignRouter,
   cloudPhone: cloudPhoneRouter,
+  proxy: proxyRouter,
   tiktokAccount: tiktokAccountRouter,
   tiktokOAuth: tiktokOAuthRouter,
   tiktokStats: tiktokStatsRouter,

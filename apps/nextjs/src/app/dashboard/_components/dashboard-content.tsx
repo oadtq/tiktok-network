@@ -63,11 +63,8 @@ const statusColors: Record<string, string> = {
 function toDatetimeLocalValue(date: Date): string {
   // "YYYY-MM-DDTHH:mm" in local time (for <input type="datetime-local" />)
   const pad = (n: number) => String(n).padStart(2, "0");
-  return [
-    date.getFullYear(),
-    pad(date.getMonth() + 1),
-    pad(date.getDate()),
-  ].join("-")
+  return [date.getFullYear(), pad(date.getMonth() + 1), pad(date.getDate())]
+    .join("-")
     .concat("T")
     .concat(pad(date.getHours()))
     .concat(":")
@@ -846,7 +843,8 @@ export function DashboardContent({ user }: DashboardContentProps) {
                         className="border-border bg-background focus:border-primary w-full rounded-lg border p-2.5 outline-none"
                       />
                       <p className="text-muted-foreground mt-2 text-xs">
-                        Required for submission. This becomes GeeLark <span className="font-medium">videoDesc</span>.
+                        Required for submission. This becomes GeeLark{" "}
+                        <span className="font-medium">videoDesc</span>.
                       </p>
                     </div>
                     <div>
@@ -878,7 +876,9 @@ export function DashboardContent({ user }: DashboardContentProps) {
                       <input
                         type="datetime-local"
                         value={uploadState.scheduledAt}
-                        min={toDatetimeLocalValue(new Date(Date.now() + 60_000))}
+                        min={toDatetimeLocalValue(
+                          new Date(Date.now() + 60_000),
+                        )}
                         onChange={(e) =>
                           setUploadState((prev) => ({
                             ...prev,
@@ -902,11 +902,16 @@ export function DashboardContent({ user }: DashboardContentProps) {
                       </Button>
                       <Button
                         onClick={handleSaveToLibrary}
-                        disabled={updateClipMutation.isPending || !uploadState.selectedClipId}
+                        disabled={
+                          updateClipMutation.isPending ||
+                          !uploadState.selectedClipId
+                        }
                         className="flex-1"
                         variant="outline"
                       >
-                        {updateClipMutation.isPending ? "Saving..." : "Save to Library"}
+                        {updateClipMutation.isPending
+                          ? "Saving..."
+                          : "Save to Library"}
                       </Button>
                       <Button
                         onClick={() => setUploadStep("review")}
@@ -923,7 +928,9 @@ export function DashboardContent({ user }: DashboardContentProps) {
                       </Button>
                     </div>
                     <div className="text-muted-foreground text-xs">
-                      Save to Library keeps this clip in <span className="font-medium">Draft</span>. Continue advances to review + submission.
+                      Save to Library keeps this clip in{" "}
+                      <span className="font-medium">Draft</span>. Continue
+                      advances to review + submission.
                     </div>
                   </div>
                 )}
@@ -962,7 +969,9 @@ export function DashboardContent({ user }: DashboardContentProps) {
                           </dt>
                           <dd className="text-sm font-medium">
                             {uploadState.scheduledAt
-                              ? new Date(uploadState.scheduledAt).toLocaleString()
+                              ? new Date(
+                                  uploadState.scheduledAt,
+                                ).toLocaleString()
                               : "—"}
                           </dd>
                         </div>

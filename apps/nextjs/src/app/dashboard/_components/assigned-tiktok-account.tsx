@@ -24,7 +24,9 @@ function AccountChip(props: {
         @{props.username}
       </span>
       <span className="text-muted-foreground text-sm">({props.name})</span>
-      <span className={`rounded-full px-2 py-0.5 text-xs ${readiness.className}`}>
+      <span
+        className={`rounded-full px-2 py-0.5 text-xs ${readiness.className}`}
+      >
         {readiness.label}
       </span>
     </div>
@@ -95,4 +97,3 @@ export function AssignedTikTokAccount() {
     </section>
   );
 }
-

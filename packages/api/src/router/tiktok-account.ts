@@ -16,6 +16,7 @@ import {
   userTiktokAccount,
 } from "@everylab/db/schema";
 
+import { scrapeTikTokProfileVideosViaApify } from "../services/apify-tiktok-profile-scraper";
 import { adminProcedure, protectedProcedure } from "../trpc";
 
 export const tiktokAccountRouter = {
@@ -480,5 +481,143 @@ export const tiktokAccountRouter = {
         })),
         total: totalCount.length,
       };
+    }),
+
+  /**
+   * Sync manual accounts via Apify (no TikTok OAuth, username-based).
+   *
+   * This writes into the same `clip` / `clip_stats` tables as the OAuth sync.
+   */
+  syncManual: adminProcedure
+    .input(
+      z.object({
+        accountId: z.string().uuid(),
+        resultsPerPage: z.number().min(1).max(200).optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const account = await ctx.db.query.tiktokAccount.findFirst({
+        where: eq(tiktokAccount.id, input.accountId),
+      });
+
+      if (!account) {
+        throw new Error("Account not found");
+      }
+
+      const apifyToken = process.env.APIFY_TOKEN;
+      if (!apifyToken) {
+        throw new Error("APIFY_TOKEN is not set");
+      }
+
+      const items = await scrapeTikTokProfileVideosViaApify({
+        token: apifyToken,
+        username: account.tiktokUsername,
+        resultsPerPage: input.resultsPerPage ?? 100,
+      });
+
+      // Best-effort account info update from first item.
+      const firstAuthor = items[0]?.authorMeta;
+      if (firstAuthor) {
+        await ctx.db
+          .update(tiktokAccount)
+          .set({
+            followerCount: firstAuthor.fans ?? account.followerCount ?? 0,
+            tiktokUserId: firstAuthor.id ?? account.tiktokUserId,
+            name: firstAuthor.nickName ?? firstAuthor.name ?? account.name,
+            updatedAt: new Date(),
+          })
+          .where(eq(tiktokAccount.id, account.id));
+      }
+
+      for (const item of items) {
+        const videoId = item.id;
+        if (!videoId) continue;
+
+        const views = item.playCount ?? item.stats?.playCount ?? 0;
+        const likes = item.diggCount ?? item.stats?.diggCount ?? 0;
+        const comments = item.commentCount ?? item.stats?.commentCount ?? 0;
+        const shares = item.shareCount ?? item.stats?.shareCount ?? 0;
+
+        const title = (item.text ?? "Untitled TikTok").slice(0, 256);
+        const description = item.text ?? null;
+        const thumbnailUrl =
+          item.videoMeta?.coverUrl ??
+          item.videoMeta?.coverImageUrl ??
+          item.videoMeta?.coverImage ??
+          item.covers?.[0] ??
+          null;
+        const tiktokVideoUrl = item.webVideoUrl ?? null;
+
+        let publishedAt: Date | null = null;
+        if (typeof item.createTime === "number") {
+          const ms =
+            item.createTime < 10_000_000_000
+              ? item.createTime * 1000
+              : item.createTime;
+          publishedAt = new Date(ms);
+        } else if (item.createTimeISO) {
+          const ms = Date.parse(item.createTimeISO);
+          if (Number.isFinite(ms)) publishedAt = new Date(ms);
+        }
+
+        // Check if clip exists
+        const existingClip = await ctx.db.query.clip.findFirst({
+          where: eq(clip.tiktokVideoId, videoId),
+        });
+
+        let clipId = existingClip?.id;
+
+        if (existingClip) {
+          await ctx.db
+            .update(clip)
+            .set({
+              title,
+              description,
+              thumbnailUrl,
+              tiktokVideoUrl,
+              publishedAt: publishedAt ?? existingClip.publishedAt,
+              status: "published",
+              updatedAt: new Date(),
+            })
+            .where(eq(clip.id, existingClip.id));
+        } else {
+          const [newClip] = await ctx.db
+            .insert(clip)
+            .values({
+              // Note: Assigning to the current user (admin) as owner for now,
+              // consistent with TikTok OAuth sync behavior.
+              userId: ctx.session.user.id,
+              tiktokAccountId: account.id,
+              title,
+              description,
+              videoUrl: tiktokVideoUrl ?? "",
+              thumbnailUrl,
+              tiktokVideoId: videoId,
+              tiktokVideoUrl,
+              durationSeconds: item.videoMeta?.duration ?? null,
+              publishedAt,
+              status: "published",
+            })
+            .returning();
+
+          clipId = newClip?.id;
+        }
+
+        if (clipId) {
+          await ctx.db.insert(clipStats).values({
+            clipId,
+            views,
+            likes,
+            comments,
+            shares,
+          });
+        }
+      }
+
+      const updated = await ctx.db.query.tiktokAccount.findFirst({
+        where: eq(tiktokAccount.id, input.accountId),
+      });
+
+      return { account: updated, syncedVideos: items.length };
     }),
 } satisfies TRPCRouterRecord;

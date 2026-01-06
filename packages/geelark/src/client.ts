@@ -210,6 +210,63 @@ export interface BatchOperationResult {
   }[];
 }
 
+// ============================================================================
+// PROXY TYPES
+// ============================================================================
+
+export type GeeLarkProxyScheme = "socks5" | "http" | "https" | (string & {});
+
+export interface ProxyAddItem {
+  scheme: GeeLarkProxyScheme;
+  server: string;
+  port: number;
+  username?: string;
+  password?: string;
+}
+
+export interface ProxyUpdateItem extends ProxyAddItem {
+  id: string;
+}
+
+export interface ProxyListItem {
+  id: string;
+  serialNo: number;
+  scheme: string;
+  server: string;
+  port: number;
+  username?: string;
+  password?: string;
+}
+
+export interface ProxyListResponse {
+  total: number;
+  page: number;
+  pageSize: number;
+  list: ProxyListItem[];
+}
+
+export interface ProxyAddResult {
+  totalAmount: number;
+  successAmount: number;
+  failAmount: number;
+  failDetails?: { index: number; code: number; msg: string }[];
+  successDetails?: { index: number; id: string }[];
+}
+
+export interface ProxyUpdateResult {
+  totalAmount: number;
+  successAmount: number;
+  failAmount: number;
+  failDetails?: { id: string; code: number; msg: string }[];
+}
+
+export interface ProxyDeleteResult {
+  totalAmount: number;
+  successAmount: number;
+  failAmount: number;
+  failDetails?: { id: string; code: number; msg: string }[];
+}
+
 export interface GeeLarkResponse<T> {
   traceId: string;
   code: number;
@@ -551,6 +608,86 @@ export class GeeLarkClient {
     const response = await this.request<BatchOperationResult>(
       "/open/v1/task/restart",
       { ids },
+    );
+    return response.data;
+  }
+
+  // ============================================================================
+  // PROXY MANAGEMENT
+  // ============================================================================
+
+  /**
+   * Add proxies (up to 100) to GeeLark.
+   *
+   * @see /open/v1/proxy/add
+   */
+  async addProxies(list: ProxyAddItem[]): Promise<ProxyAddResult> {
+    if (list.length > 100) {
+      throw new Error("Cannot add more than 100 proxies at once");
+    }
+    const response = await this.request<ProxyAddResult>("/open/v1/proxy/add", {
+      list,
+    });
+    return response.data;
+  }
+
+  /**
+   * Update proxies (up to 100) on GeeLark.
+   *
+   * @see /open/v1/proxy/update
+   */
+  async updateProxies(list: ProxyUpdateItem[]): Promise<ProxyUpdateResult> {
+    if (list.length > 100) {
+      throw new Error("Cannot update more than 100 proxies at once");
+    }
+    const response = await this.request<ProxyUpdateResult>(
+      "/open/v1/proxy/update",
+      { list },
+    );
+    return response.data;
+  }
+
+  /**
+   * Delete proxies (up to 100) from GeeLark.
+   *
+   * @see /open/v1/proxy/delete
+   */
+  async deleteProxies(ids: string[]): Promise<ProxyDeleteResult> {
+    if (ids.length > 100) {
+      throw new Error("Cannot delete more than 100 proxies at once");
+    }
+    const response = await this.request<ProxyDeleteResult>(
+      "/open/v1/proxy/delete",
+      { ids },
+    );
+    return response.data;
+  }
+
+  /**
+   * List proxies from GeeLark.
+   *
+   * @see /open/v1/proxy/list
+   */
+  async listProxies(options: {
+    page?: number;
+    pageSize?: number;
+    ids?: string[];
+  }): Promise<ProxyListResponse> {
+    const page = options.page ?? 1;
+    const pageSize = Math.min(options.pageSize ?? 100, 100);
+    if (options.ids && options.ids.length > 100) {
+      throw new Error("Cannot list more than 100 ids at once");
+    }
+
+    const body: Record<string, unknown> = {
+      page,
+      pageSize,
+    };
+    if (options.ids && options.ids.length > 0) body.ids = options.ids;
+
+    const response = await this.request<ProxyListResponse>(
+      "/open/v1/proxy/list",
+      body,
     );
     return response.data;
   }

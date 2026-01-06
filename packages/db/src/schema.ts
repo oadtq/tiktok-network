@@ -55,7 +55,68 @@ export const cloudPhone = pgTable("cloud_phone", (t) => ({
 
 export const cloudPhoneRelations = relations(cloudPhone, ({ many }) => ({
   tiktokAccounts: many(tiktokAccount),
+  proxyAssignments: many(geelarkProxyAssignment),
 }));
+
+// ============================================================================
+// GEELARK PROXIES (cached from GeeLark API)
+// ============================================================================
+
+export const geelarkProxy = pgTable("geelark_proxy", (t) => ({
+  id: t.varchar({ length: 256 }).notNull().primaryKey(), // GeeLark proxy ID
+  serialNo: t.integer(),
+  scheme: t.varchar({ length: 32 }).notNull(), // socks5|http|https
+  server: t.varchar({ length: 256 }).notNull(),
+  port: t.integer().notNull(),
+  username: t.text(),
+  password: t.text(),
+  lastSyncedAt: t.timestamp({ mode: "date", withTimezone: true }).defaultNow(),
+  createdAt: t
+    .timestamp({ mode: "date", withTimezone: true })
+    .defaultNow()
+    .notNull(),
+  updatedAt: t
+    .timestamp({ mode: "date", withTimezone: true })
+    .$onUpdateFn(() => new Date()),
+}));
+
+export const geelarkProxyAssignment = pgTable(
+  "geelark_proxy_assignment",
+  (t) => ({
+    id: t.uuid().notNull().primaryKey().defaultRandom(),
+    proxyId: t
+      .varchar({ length: 256 })
+      .notNull()
+      .references(() => geelarkProxy.id, { onDelete: "cascade" }),
+    cloudPhoneId: t
+      .varchar({ length: 256 })
+      .notNull()
+      .unique()
+      .references(() => cloudPhone.id, { onDelete: "cascade" }),
+    createdAt: t
+      .timestamp({ mode: "date", withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  }),
+);
+
+export const geelarkProxyRelations = relations(geelarkProxy, ({ many }) => ({
+  assignments: many(geelarkProxyAssignment),
+}));
+
+export const geelarkProxyAssignmentRelations = relations(
+  geelarkProxyAssignment,
+  ({ one }) => ({
+    proxy: one(geelarkProxy, {
+      fields: [geelarkProxyAssignment.proxyId],
+      references: [geelarkProxy.id],
+    }),
+    cloudPhone: one(cloudPhone, {
+      fields: [geelarkProxyAssignment.cloudPhoneId],
+      references: [cloudPhone.id],
+    }),
+  }),
+);
 
 // ============================================================================
 // TIKTOK ACCOUNTS (managed accounts for publishing)
@@ -326,6 +387,9 @@ export const geelarkTaskRelations = relations(geelarkTask, ({ one }) => ({
 
 // Cloud Phone
 export const SelectCloudPhoneSchema = createSelectSchema(cloudPhone);
+
+// GeeLark Proxy
+export const SelectGeeLarkProxySchema = createSelectSchema(geelarkProxy);
 
 // TikTok Account
 export const CreateTiktokAccountSchema = createInsertSchema(tiktokAccount, {

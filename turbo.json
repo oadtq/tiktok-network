@@ -36,6 +36,9 @@
       "cache": false,
       "interactive": true
     },
+    "generate": {
+      "cache": false
+    },
     "studio": {
       "cache": false,
       "persistent": true
@@ -60,6 +63,7 @@
     "S3_PUBLIC_URL",
     "TIKTOK_CLIENT_KEY",
     "TIKTOK_CLIENT_SECRET",
+    "APIFY_TOKEN",
     "GEELARK_APP_ID",
     "GEELARK_API_KEY"
   ],

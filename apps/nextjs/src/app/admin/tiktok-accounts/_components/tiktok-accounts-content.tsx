@@ -163,6 +163,38 @@ export function TikTokAccountsContent({ user }: TikTokAccountsContentProps) {
     }),
   );
 
+  const syncManualAccount = useMutation(
+    trpc.tiktokAccount.syncManual.mutationOptions({
+      onSuccess: (data) => {
+        setConnectError(null);
+        setConnectSuccess(
+          `Manual sync complete: ${data.syncedVideos} videos processed`,
+        );
+        void queryClient.invalidateQueries({
+          queryKey: trpc.tiktokAccount.list.queryKey(),
+        });
+        if (detailsAccountId) {
+          void queryClient.invalidateQueries({
+            queryKey: trpc.tiktokAccount.getStats.queryKey({
+              id: detailsAccountId,
+            }),
+          });
+          void queryClient.invalidateQueries({
+            queryKey: trpc.tiktokAccount.getClips.queryKey({
+              id: detailsAccountId,
+              limit: 20,
+              offset: clipsPage * 20,
+            }),
+          });
+        }
+      },
+      onError: (error) => {
+        setConnectSuccess(null);
+        setConnectError(error.message);
+      },
+    }),
+  );
+
   const disconnectAccount = useMutation(
     trpc.tiktokOAuth.disconnect.mutationOptions({
       onSuccess: () => {
@@ -455,27 +487,27 @@ export function TikTokAccountsContent({ user }: TikTokAccountsContentProps) {
                 />
                 Refresh
               </Button>
+              <Button
+                variant={oauthConfig?.configured ? "outline" : "default"}
+                className="gap-2"
+                onClick={() => {
+                  setFormData({ name: "", tiktokUsername: "" });
+                  setIsCreateModalOpen(true);
+                }}
+              >
+                <Plus className="size-4" />
+                Add Account
+              </Button>
               {oauthConfig?.configured ? (
                 <Button
                   className="gap-2"
                   onClick={handleConnectAccount}
                   disabled={getAuthUrl.isPending}
                 >
-                  <Plus className="size-4" />
+                  <ExternalLink className="size-4" />
                   Connect Account
                 </Button>
-              ) : (
-                <Button
-                  className="gap-2"
-                  onClick={() => {
-                    setFormData({ name: "", tiktokUsername: "" });
-                    setIsCreateModalOpen(true);
-                  }}
-                >
-                  <Plus className="size-4" />
-                  Add Account
-                </Button>
-              )}
+              ) : null}
             </div>
           </div>
         </header>
@@ -577,26 +609,28 @@ export function TikTokAccountsContent({ user }: TikTokAccountsContentProps) {
                           <p className="text-muted-foreground mt-4 text-sm">
                             No TikTok accounts yet
                           </p>
-                          {oauthConfig?.configured ? (
+                          <div className="mt-4 flex items-center justify-center gap-2">
                             <Button
-                              className="mt-4 gap-2"
-                              onClick={handleConnectAccount}
-                            >
-                              <Plus className="size-4" />
-                              Connect First Account
-                            </Button>
-                          ) : (
-                            <Button
-                              className="mt-4 gap-2"
+                              className="gap-2"
                               onClick={() => {
                                 setFormData({ name: "", tiktokUsername: "" });
                                 setIsCreateModalOpen(true);
                               }}
                             >
                               <Plus className="size-4" />
-                              Add Your First Account
+                              Add Account
                             </Button>
-                          )}
+                            {oauthConfig?.configured ? (
+                              <Button
+                                variant="outline"
+                                className="gap-2"
+                                onClick={handleConnectAccount}
+                              >
+                                <ExternalLink className="size-4" />
+                                Connect via OAuth
+                              </Button>
+                            ) : null}
+                          </div>
                         </td>
                       </tr>
                     ) : (
@@ -705,6 +739,25 @@ export function TikTokAccountsContent({ user }: TikTokAccountsContentProps) {
                                   >
                                     <RefreshCw
                                       className={`size-3 ${syncAccount.isPending ? "animate-spin" : ""}`}
+                                    />
+                                    Sync
+                                  </Button>
+                                )}
+                                {!account.accessToken && (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="gap-1"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      syncManualAccount.mutate({
+                                        accountId: account.id,
+                                      });
+                                    }}
+                                    disabled={syncManualAccount.isPending}
+                                  >
+                                    <RefreshCw
+                                      className={`size-3 ${syncManualAccount.isPending ? "animate-spin" : ""}`}
                                     />
                                     Sync
                                   </Button>
